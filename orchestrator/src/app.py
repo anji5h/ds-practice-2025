@@ -77,32 +77,31 @@ def call_transaction_verification(cvv, result):
         result.put(("is_verified", False))
 
 
-def call_suggestions(comment, result):
+def call_suggestions(items, result):
     try:
         print(f"Starting book suggestions request")
-        
-        # Ensure 'comment' matches the expected field in the proto file (probably 'query')
+
         with grpc.insecure_channel("suggestions:50053") as channel:
             stub = suggestions_grpc.SuggestionServiceStub(channel)
-            
+
             # If the proto expects `query`, pass it as `query`
-            response = stub.GetSuggestions(
-                suggestions.SuggestionsRequest(query=comment)  # Assuming 'query' in the proto
-            )
+            query = ";".join([item["name"] for item in items])
+            response = stub.GetSuggestions(suggestions.SuggestionsRequest(query=query))
             print(f"Book suggestions received")
-            
+
             # Convert the response to dictionary
             response_dict = MessageToDict(response)
-            
+
             # Ensure the correct field name (suggestedBooks in the response)
             suggestions_list = response_dict.get("suggestedBooks", [])
-            
+
             # Put the suggestions in the result queue
             result.put(("suggestions", suggestions_list))
 
     except Exception as e:
         print(f"ERROR in suggestions service: {str(e)}")
         result.put(("suggestions", []))
+
 
 @app.route("/checkout", methods=["POST"])
 def checkout():
@@ -112,7 +111,7 @@ def checkout():
         request_data = json.loads(request.data)
         result_queue = queue.Queue()
 
-        print(f"Processing order for user: {request_data.get('userId', 'unknown')}")
+        print(f"Processing order for user")
         print(f"Creating worker threads")
         threads = [
             threading.Thread(
@@ -125,7 +124,7 @@ def checkout():
             ),
             threading.Thread(
                 target=call_suggestions,
-                args=(request_data["userComment"], result_queue),
+                args=(request_data["items"], result_queue),
             ),
         ]
 
@@ -155,8 +154,13 @@ def checkout():
             "orderId": "12345",
             "status": status,
             "suggestedBooks": [
-                {"bookId": str(i + 1), "title": title, "author": "Unknown"}
-                for i, title in enumerate(results.get("suggestions", []))
+                {
+                    "bookId": str(i + 1),
+                    "title": book["title"],
+                    "author": book["author"],
+                    "link": book["link"],
+                }
+                for i, book in enumerate(results.get("suggestions", []))
             ],
         }
 

@@ -2,7 +2,7 @@ import sys
 import os
 import logging
 import grpc
-import requests  # Import requests to call third-party API
+import requests
 from concurrent import futures
 
 FILE = __file__ if '__file__' in globals() else os.getenv("PYTHONFILE", "")

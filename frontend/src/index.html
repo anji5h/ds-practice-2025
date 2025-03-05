@@ -266,8 +266,8 @@ Please handle with care.</textarea
                 .map(
                   (book) => `
                         <div class="bg-white p-3 rounded-lg">
-                            <a href="${book.title.link}" class="text-black" target="_blank">
-                              ${book?.title?.title} by <span class="underline">${book?.title?.author}</span>
+                            <a href="${book?.link}" class="text-black" target="_blank">
+                              ${book?.title} by <span class="underline">${book?.author}</span>
                             </a>
                         </div>
                     `
