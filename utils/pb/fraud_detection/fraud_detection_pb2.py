@@ -22,19 +22,32 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15\x66raud_detection.proto\x12\x05hello\"\x1e\n\x0c\x46raudRequest\x12\x0e\n\x06number\x18\x01 \x01(\t\"!\n\rFraudResponse\x12\x10\n\x08is_fraud\x18\x01 \x01(\x08\x32G\n\x0c\x46raudService\x12\x37\n\nCheckFraud\x12\x13.hello.FraudRequest\x1a\x14.hello.FraudResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15\x66raud_detection.proto\x12\x05\x66raud\x1a\x1bgoogle/protobuf/empty.proto\"%\n\x04User\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontact\x18\x02 \x01(\t\"A\n\nCreditCard\x12\x0e\n\x06number\x18\x01 \x01(\t\x12\x16\n\x0e\x65xpirationDate\x18\x02 \x01(\t\x12\x0b\n\x03\x63vv\x18\x03 \x01(\t\"&\n\x04Item\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x10\n\x08quantity\x18\x02 \x01(\x05\"T\n\x07\x41\x64\x64ress\x12\x0e\n\x06street\x18\x01 \x01(\t\x12\x0c\n\x04\x63ity\x18\x02 \x01(\t\x12\r\n\x05state\x18\x03 \x01(\t\x12\x0b\n\x03zip\x18\x04 \x01(\t\x12\x0f\n\x07\x63ountry\x18\x05 \x01(\t\"\x9b\x02\n\tOrderData\x12\x19\n\x04user\x18\x01 \x01(\x0b\x32\x0b.fraud.User\x12&\n\x0b\x63redit_card\x18\x02 \x01(\x0b\x32\x11.fraud.CreditCard\x12\x1a\n\x05items\x18\x03 \x03(\x0b\x32\x0b.fraud.Item\x12\'\n\x0f\x62illing_address\x18\x04 \x01(\x0b\x32\x0e.fraud.Address\x12(\n\x10shipping_address\x18\x05 \x01(\x0b\x32\x0e.fraud.Address\x12\x17\n\x0fshipping_method\x18\x06 \x01(\t\x12\x15\n\rgift_wrapping\x18\x07 \x01(\x08\x12\x14\n\x0cuser_comment\x18\x08 \x01(\t\x12\x16\n\x0eterms_accepted\x18\t \x01(\x08\"F\n\x0cOrderRequest\x12\x10\n\x08order_id\x18\x01 \x01(\t\x12$\n\norder_data\x18\x02 \x01(\x0b\x32\x10.fraud.OrderData\"\x1e\n\x0c\x46raudRequest\x12\x0e\n\x06number\x18\x01 \x01(\t\"!\n\rFraudResponse\x12\x10\n\x08is_fraud\x18\x01 \x01(\x08\x32\x81\x01\n\x0c\x46raudService\x12\x38\n\tInitOrder\x12\x13.fraud.OrderRequest\x1a\x16.google.protobuf.Empty\x12\x37\n\nCheckFraud\x12\x13.fraud.FraudRequest\x1a\x14.fraud.FraudResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'fraud_detection_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_FRAUDREQUEST']._serialized_start=32
-  _globals['_FRAUDREQUEST']._serialized_end=62
-  _globals['_FRAUDRESPONSE']._serialized_start=64
-  _globals['_FRAUDRESPONSE']._serialized_end=97
-  _globals['_FRAUDSERVICE']._serialized_start=99
-  _globals['_FRAUDSERVICE']._serialized_end=170
+  _globals['_USER']._serialized_start=61
+  _globals['_USER']._serialized_end=98
+  _globals['_CREDITCARD']._serialized_start=100
+  _globals['_CREDITCARD']._serialized_end=165
+  _globals['_ITEM']._serialized_start=167
+  _globals['_ITEM']._serialized_end=205
+  _globals['_ADDRESS']._serialized_start=207
+  _globals['_ADDRESS']._serialized_end=291
+  _globals['_ORDERDATA']._serialized_start=294
+  _globals['_ORDERDATA']._serialized_end=577
+  _globals['_ORDERREQUEST']._serialized_start=579
+  _globals['_ORDERREQUEST']._serialized_end=649
+  _globals['_FRAUDREQUEST']._serialized_start=651
+  _globals['_FRAUDREQUEST']._serialized_end=681
+  _globals['_FRAUDRESPONSE']._serialized_start=683
+  _globals['_FRAUDRESPONSE']._serialized_end=716
+  _globals['_FRAUDSERVICE']._serialized_start=719
+  _globals['_FRAUDSERVICE']._serialized_end=848
 # @@protoc_insertion_point(module_scope)

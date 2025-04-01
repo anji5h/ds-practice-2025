@@ -19,6 +19,21 @@ from concurrent import futures
 # Create a class to define the server functions, derived from
 # fraud_detection_pb2_grpc.HelloServiceServicer
 class FraudService(fraud_detection_grpc.FraudServiceServicer):
+    def __init__(self, svc_idx=1, total_svcs=3):
+        self.svc_idx = svc_idx
+        self.total_svcs = total_svcs
+        self.orders = {}
+
+    def InitOrder(self, order_id, data):
+        # Initialize an order with an empty vector clock for tracking
+        self.orders[order_id] = {"data": data, "vc": [0] * self.total_svcs}
+
+    def merge_and_increment(self, local_vc, incoming_vc):
+        # Merge the incoming vector clock with the local one and increment the current service's slot
+        for i in range(self.total_svcs):
+            local_vc[i] = max(local_vc[i], incoming_vc[i])  # Merge the clocks
+        local_vc[self.svc_idx] += 1  # Increment this service's vector clock slot
+
     # Create an RPC function to check fraud
     def CheckFraud(self, request, context):
         # Create a FraudResponse object

@@ -4,6 +4,7 @@ import grpc
 import warnings
 
 import fraud_detection_pb2 as fraud__detection__pb2
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 GRPC_GENERATED_VERSION = '1.70.0'
 GRPC_VERSION = grpc.__version__
@@ -34,8 +35,13 @@ class FraudServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.InitOrder = channel.unary_unary(
+                '/fraud.FraudService/InitOrder',
+                request_serializer=fraud__detection__pb2.OrderRequest.SerializeToString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                _registered_method=True)
         self.CheckFraud = channel.unary_unary(
-                '/hello.FraudService/CheckFraud',
+                '/fraud.FraudService/CheckFraud',
                 request_serializer=fraud__detection__pb2.FraudRequest.SerializeToString,
                 response_deserializer=fraud__detection__pb2.FraudResponse.FromString,
                 _registered_method=True)
@@ -43,6 +49,12 @@ class FraudServiceStub(object):
 
 class FraudServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
+
+    def InitOrder(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
 
     def CheckFraud(self, request, context):
         """Missing associated documentation comment in .proto file."""
@@ -53,6 +65,11 @@ class FraudServiceServicer(object):
 
 def add_FraudServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'InitOrder': grpc.unary_unary_rpc_method_handler(
+                    servicer.InitOrder,
+                    request_deserializer=fraud__detection__pb2.OrderRequest.FromString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
             'CheckFraud': grpc.unary_unary_rpc_method_handler(
                     servicer.CheckFraud,
                     request_deserializer=fraud__detection__pb2.FraudRequest.FromString,
@@ -60,14 +77,41 @@ def add_FraudServiceServicer_to_server(servicer, server):
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'hello.FraudService', rpc_method_handlers)
+            'fraud.FraudService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('hello.FraudService', rpc_method_handlers)
+    server.add_registered_method_handlers('fraud.FraudService', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
 class FraudService(object):
     """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def InitOrder(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/fraud.FraudService/InitOrder',
+            fraud__detection__pb2.OrderRequest.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
 
     @staticmethod
     def CheckFraud(request,
@@ -83,7 +127,7 @@ class FraudService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/hello.FraudService/CheckFraud',
+            '/fraud.FraudService/CheckFraud',
             fraud__detection__pb2.FraudRequest.SerializeToString,
             fraud__detection__pb2.FraudResponse.FromString,
             options,

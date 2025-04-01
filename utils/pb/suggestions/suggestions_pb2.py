@@ -22,19 +22,32 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11suggestions.proto\x12\nsuggestion\"$\n\x11SuggestionRequest\x12\x0f\n\x07\x63omment\x18\x01 \x01(\t\"*\n\x13SuggestionsResponse\x12\x13\n\x0bsuggestions\x18\x01 \x03(\t2e\n\x11SuggestionService\x12P\n\x0eGetSuggestions\x12\x1d.suggestion.SuggestionRequest\x1a\x1f.suggestion.SuggestionsResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11suggestions.proto\x12\nsuggestion\x1a\x1bgoogle/protobuf/empty.proto\"%\n\x04User\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontact\x18\x02 \x01(\t\"A\n\nCreditCard\x12\x0e\n\x06number\x18\x01 \x01(\t\x12\x16\n\x0e\x65xpirationDate\x18\x02 \x01(\t\x12\x0b\n\x03\x63vv\x18\x03 \x01(\t\"&\n\x04Item\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x10\n\x08quantity\x18\x02 \x01(\x05\"T\n\x07\x41\x64\x64ress\x12\x0e\n\x06street\x18\x01 \x01(\t\x12\x0c\n\x04\x63ity\x18\x02 \x01(\t\x12\r\n\x05state\x18\x03 \x01(\t\x12\x0b\n\x03zip\x18\x04 \x01(\t\x12\x0f\n\x07\x63ountry\x18\x05 \x01(\t\"\xb4\x02\n\tOrderData\x12\x1e\n\x04user\x18\x01 \x01(\x0b\x32\x10.suggestion.User\x12+\n\x0b\x63redit_card\x18\x02 \x01(\x0b\x32\x16.suggestion.CreditCard\x12\x1f\n\x05items\x18\x03 \x03(\x0b\x32\x10.suggestion.Item\x12,\n\x0f\x62illing_address\x18\x04 \x01(\x0b\x32\x13.suggestion.Address\x12-\n\x10shipping_address\x18\x05 \x01(\x0b\x32\x13.suggestion.Address\x12\x17\n\x0fshipping_method\x18\x06 \x01(\t\x12\x15\n\rgift_wrapping\x18\x07 \x01(\x08\x12\x14\n\x0cuser_comment\x18\x08 \x01(\t\x12\x16\n\x0eterms_accepted\x18\t \x01(\x08\"K\n\x0cOrderRequest\x12\x10\n\x08order_id\x18\x01 \x01(\t\x12)\n\norder_data\x18\x02 \x01(\x0b\x32\x15.suggestion.OrderData\"$\n\x11SuggestionRequest\x12\x0f\n\x07\x63omment\x18\x01 \x01(\t\"*\n\x13SuggestionsResponse\x12\x13\n\x0bsuggestions\x18\x01 \x03(\t2\xa4\x01\n\x11SuggestionService\x12=\n\tInitOrder\x12\x18.suggestion.OrderRequest\x1a\x16.google.protobuf.Empty\x12P\n\x0eGetSuggestions\x12\x1d.suggestion.SuggestionRequest\x1a\x1f.suggestion.SuggestionsResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'suggestions_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_SUGGESTIONREQUEST']._serialized_start=33
-  _globals['_SUGGESTIONREQUEST']._serialized_end=69
-  _globals['_SUGGESTIONSRESPONSE']._serialized_start=71
-  _globals['_SUGGESTIONSRESPONSE']._serialized_end=113
-  _globals['_SUGGESTIONSERVICE']._serialized_start=115
-  _globals['_SUGGESTIONSERVICE']._serialized_end=216
+  _globals['_USER']._serialized_start=62
+  _globals['_USER']._serialized_end=99
+  _globals['_CREDITCARD']._serialized_start=101
+  _globals['_CREDITCARD']._serialized_end=166
+  _globals['_ITEM']._serialized_start=168
+  _globals['_ITEM']._serialized_end=206
+  _globals['_ADDRESS']._serialized_start=208
+  _globals['_ADDRESS']._serialized_end=292
+  _globals['_ORDERDATA']._serialized_start=295
+  _globals['_ORDERDATA']._serialized_end=603
+  _globals['_ORDERREQUEST']._serialized_start=605
+  _globals['_ORDERREQUEST']._serialized_end=680
+  _globals['_SUGGESTIONREQUEST']._serialized_start=682
+  _globals['_SUGGESTIONREQUEST']._serialized_end=718
+  _globals['_SUGGESTIONSRESPONSE']._serialized_start=720
+  _globals['_SUGGESTIONSRESPONSE']._serialized_end=762
+  _globals['_SUGGESTIONSERVICE']._serialized_start=765
+  _globals['_SUGGESTIONSERVICE']._serialized_end=929
 # @@protoc_insertion_point(module_scope)

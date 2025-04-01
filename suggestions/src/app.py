@@ -17,6 +17,21 @@ from concurrent import futures
 # Create a class to define the server functions, derived from
 # suggestion_pb2_grpc.SuggestionServiceServicer
 class SuggestionService(suggestion_grpc.SuggestionServiceServicer):
+    def __init__(self, svc_idx=2, total_svcs=3):
+        self.svc_idx = svc_idx
+        self.total_svcs = total_svcs
+        self.orders = {}
+
+    def InitOrder(self, order_id, data):
+        # Initialize an order with an empty vector clock for tracking
+        self.orders[order_id] = {"data": data, "vc": [0] * self.total_svcs}
+
+    def merge_and_increment(self, local_vc, incoming_vc):
+        # Merge the incoming vector clock with the local one and increment the current service's slot
+        for i in range(self.total_svcs):
+            local_vc[i] = max(local_vc[i], incoming_vc[i])  # Merge the clocks
+        local_vc[self.svc_idx] += 1  # Increment this service's vector clock slot
+
     # Create an RPC function to get suggestions
     def GetSuggestions(self, request, context):
         # Assume we have a list of suggestions based on the request input (e.g., a category or query)
