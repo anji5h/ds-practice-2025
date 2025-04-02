@@ -53,7 +53,7 @@ message OrderRequest{
 }
 
 message SuggestionRequest {
-    string comment = 1;
+    string order_id = 1;
 }
 
 message SuggestionsResponse {

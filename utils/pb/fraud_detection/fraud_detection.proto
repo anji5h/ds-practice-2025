@@ -6,7 +6,8 @@ package fraud;
 
 service FraudService {
     rpc InitOrder(OrderRequest) returns (google.protobuf.Empty);
-    rpc CheckFraud (FraudRequest) returns (FraudResponse);
+    rpc CheckUser(FraudRequest) returns (FraudResponse)
+    rpc CheckCreditCard(FraudRequest) returns (FraudResponse)
 }
 
 message User {
@@ -51,7 +52,7 @@ message OrderRequest{
 }
 
 message FraudRequest {
-    string number = 1;
+    string order_id = 1;
 }
 
 message FraudResponse {

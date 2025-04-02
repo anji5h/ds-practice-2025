@@ -8,7 +8,9 @@ package transaction;
 
 service TransactionVerificationService {
     rpc InitOrder(OrderRequest) returns (google.protobuf.Empty);
-    rpc VerifyTransaction (TransactionRequest) returns (TransactionVerificationResponse);
+    rpc VerifyUser(TransactionRequest) returns (TransactionVerificationResponse)
+    rpc VerifyAddress(TransactionRequest) returns (TransactionVerificationResponse)
+    rpc VerifyCreditCard(TransactionRequest) returns (TransactionVerificationResponse)
 }
 
 message User {
@@ -53,8 +55,7 @@ message OrderRequest{
 }
 
 message TransactionRequest {
-    string id = 1;
-    int32 cvv = 2;
+    string order_id = 1
 }
 
 message TransactionVerificationResponse {
