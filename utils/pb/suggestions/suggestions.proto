@@ -1,5 +1,3 @@
-// suggestion.proto
-
 syntax = "proto3";
 
 import "google/protobuf/empty.proto";
@@ -56,6 +54,14 @@ message SuggestionRequest {
     string order_id = 1;
 }
 
+
+message Book {
+  string title = 1;
+  string author = 2;
+  string description = 3;
+  string link = 4;
+}
+
 message SuggestionsResponse {
-    repeated string suggestions = 1;
+  repeated Book suggestedBooks = 1;
 }

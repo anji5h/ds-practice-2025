@@ -27,7 +27,8 @@ if _version_not_supported:
 
 
 class SuggestionServiceStub(object):
-    """Missing associated documentation comment in .proto file."""
+    """SuggestionService service definition
+    """
 
     def __init__(self, channel):
         """Constructor.
@@ -41,14 +42,15 @@ class SuggestionServiceStub(object):
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.GetSuggestions = channel.unary_unary(
-                '/suggestion.SuggestionService/GetSuggestions',
-                request_serializer=suggestions__pb2.SuggestionRequest.SerializeToString,
+                '/suggestions.SuggestionService/GetSuggestions',
+                request_serializer=suggestions__pb2.SuggestionsRequest.SerializeToString,
                 response_deserializer=suggestions__pb2.SuggestionsResponse.FromString,
                 _registered_method=True)
 
 
 class SuggestionServiceServicer(object):
-    """Missing associated documentation comment in .proto file."""
+    """SuggestionService service definition
+    """
 
     def InitOrder(self, request, context):
         """Missing associated documentation comment in .proto file."""
@@ -72,19 +74,20 @@ def add_SuggestionServiceServicer_to_server(servicer, server):
             ),
             'GetSuggestions': grpc.unary_unary_rpc_method_handler(
                     servicer.GetSuggestions,
-                    request_deserializer=suggestions__pb2.SuggestionRequest.FromString,
+                    request_deserializer=suggestions__pb2.SuggestionsRequest.FromString,
                     response_serializer=suggestions__pb2.SuggestionsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'suggestion.SuggestionService', rpc_method_handlers)
+            'suggestions.SuggestionService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('suggestion.SuggestionService', rpc_method_handlers)
+    server.add_registered_method_handlers('suggestions.SuggestionService', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
 class SuggestionService(object):
-    """Missing associated documentation comment in .proto file."""
+    """SuggestionService service definition
+    """
 
     @staticmethod
     def InitOrder(request,
@@ -127,8 +130,8 @@ class SuggestionService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/suggestion.SuggestionService/GetSuggestions',
-            suggestions__pb2.SuggestionRequest.SerializeToString,
+            '/suggestions.SuggestionService/GetSuggestions',
+            suggestions__pb2.SuggestionsRequest.SerializeToString,
             suggestions__pb2.SuggestionsResponse.FromString,
             options,
             channel_credentials,
