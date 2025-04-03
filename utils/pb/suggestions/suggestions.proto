@@ -7,6 +7,7 @@ package suggestion;
 service SuggestionService {
     rpc InitOrder(OrderRequest) returns (google.protobuf.Empty);
     rpc GetSuggestions (SuggestionRequest) returns (SuggestionsResponse);
+    rpc CleanOrder (SuggestionRequest) returns (CleanOrderResponse);
 }
 
 message OrderRequest{
@@ -16,6 +17,11 @@ message OrderRequest{
 
 message SuggestionRequest {
     string order_id = 1;
+    repeated int32 vc = 2;
+}
+
+message CleanOrderResponse{
+    string result = 1;
     repeated int32 vc = 2;
 }
 

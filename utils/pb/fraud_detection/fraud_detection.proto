@@ -8,6 +8,7 @@ service FraudService {
     rpc InitOrder(OrderRequest) returns (google.protobuf.Empty);
     rpc CheckUser(FraudRequest) returns (FraudResponse);
     rpc CheckCreditCard(FraudRequest) returns (FraudResponse);
+    rpc CleanOrder(FraudRequest) returns (FraudResponse);
 }
 
 message OrderRequest{
@@ -21,6 +22,6 @@ message FraudRequest {
 }
 
 message FraudResponse {
-    bool is_fraud = 1;
+    string result = 1;
     repeated int32 vc = 2;
 }

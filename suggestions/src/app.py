@@ -36,6 +36,13 @@ class SuggestionService(suggestion_grpc.SuggestionServiceServicer):
             local_vc[i] = max(local_vc[i], incoming_vc[i])
         local_vc[self.svc_idx] += 1
 
+    def clean_order(self, order_id, local_vc, incoming_vc):
+        if local_vc[self.svc_idx] <= incoming_vc[self.svc_idx]:
+            self.orders.pop(order_id)
+            return True
+        else:
+            return False
+
     def GetSuggestions(self, request, context):
         print(f"Received order_id {request.order_id}")
 
@@ -80,6 +87,25 @@ class SuggestionService(suggestion_grpc.SuggestionServiceServicer):
         except Exception as e:
             print(f"Error fetching books: {e}")
             return []
+
+    def CleanOrder(self, request, context):
+        print(f"cleaning order {request.order_id}")
+        order_data = self.orders.get(request.order_id, None)
+
+        response = suggestion.CleanOrderResponse()
+
+        if not order_data:
+            response.result = "fail"
+            response.vc.extend(request.vc)
+            return response
+
+        response.result = (
+            "fail"
+            if not self.clean_order(request.order_id, order_data["vc"], request.vc)
+            else "pass"
+        )
+        response.vc.extend(order_data["vc"])
+        return response
 
 
 def serve():

@@ -67,7 +67,7 @@ class OrchestratorService:
             )
             print(f"fraud_detection: check_user complete\n")
             response_dict = MessageToDict(response)
-            if response_dict["isFraud"]:
+            if response_dict["result"] == "fail":
                 raise Exception(f"FRAUD_DETECTION: CHECK USER FAILED")
 
             self.merge_and_increment(self.vc, response_dict["vc"])
@@ -81,10 +81,22 @@ class OrchestratorService:
             )
             print(f"fraud_detection: check_user complete\n")
             response_dict = MessageToDict(response)
-            if response_dict["isFraud"]:
+            if response_dict["result"] == "fail":
                 raise Exception(f"FRAUD_DETECTION: CHECK USER FAILED")
 
             self.merge_and_increment(self.vc, response_dict["vc"])
+
+    def clean_fraud_order(self, order_id):
+        print(f"Starting fraud cleanup request, order_id: {order_id}\n")
+        with grpc.insecure_channel(self.fraud_detection_url) as channel:
+            stub = fraud_detection_grpc.FraudServiceStub(channel)
+            response = stub.CleanOrder(
+                fraud_detection.FraudRequest(order_id=order_id, vc=self.vc)
+            )
+            print(f"fraud_detection: order cleanup complete\n")
+            response_dict = MessageToDict(response)
+            if response_dict["result"] == "fail":
+                print(f"FRAUD_DETECTION: CLEANUP FAILED, {order_id}")
 
     def transaction_init(self, order_id, order_data):
         try:
@@ -117,7 +129,7 @@ class OrchestratorService:
             print(f"transaction_verification: verify user complete")
             response_dict = MessageToDict(response)
 
-            if not response_dict["isVerified"]:
+            if response_dict["result"] == "fail":
                 raise Exception(f"TRANSACTION VERIFICATION: USER VERIFY FAILED")
 
             self.merge_and_increment(self.vc, response_dict["vc"])
@@ -136,7 +148,7 @@ class OrchestratorService:
             print(f"transaction_verification: verify credit card complete\n")
             response_dict = MessageToDict(response)
 
-            if not response_dict["isVerified"]:
+            if response_dict["result"] == "fail":
                 raise Exception(f"TRANSACTION VERIFICATION: CREDIT CARD VERIFY FAILED")
 
             self.merge_and_increment(self.vc, response_dict["vc"])
@@ -155,10 +167,27 @@ class OrchestratorService:
             print(f"transaction_verification: verify address complete\n")
             response_dict = MessageToDict(response)
 
-            if not response_dict["isVerified"]:
+            if response_dict["result"] == "fail":
                 raise Exception(f"TRANSACTION VERIFICATION: ADDRESS VERIFY FAILED")
 
             self.merge_and_increment(self.vc, response_dict["vc"])
+
+    def clean_transaction_order(self, order_id):
+        print(f"Starting transaction cleanup request\n")
+        with grpc.insecure_channel(self.transaction_verification_url) as channel:
+            stub = transaction_verification_grpc.TransactionVerificationServiceStub(
+                channel
+            )
+            response = stub.CleanOrder(
+                transaction_verification.TransactionRequest(
+                    order_id=order_id, vc=self.vc
+                )
+            )
+            print(f"transaction_verification: order cleanup complete\n")
+            response_dict = MessageToDict(response)
+
+            if response_dict["result"] == "fail":
+                print(f"TRANSACTION VERIFICATION: CLEANUP FAILED, {order_id}")
 
     def suggestion_init(self, order_id, order_data):
         try:
@@ -190,3 +219,16 @@ class OrchestratorService:
         except Exception as e:
             print(f"ERROR in suggestions service: {str(e)}")
             return []
+
+    def clean_suggestion_order(self, order_id):
+            print(f"Starting suggestion cleanup request\n")
+            with grpc.insecure_channel(self.suggestions_url) as channel:
+                stub = suggestions_grpc.SuggestionServiceStub(channel)
+                response = stub.CleanOrder(
+                    suggestions.SuggestionRequest(order_id=order_id, vc=self.vc)
+                )
+                print(f"suggestions: order cleanup complete\n")
+
+                response_dict = MessageToDict(response)
+                if response_dict["result"] == "fail":
+                    print(f"SUGGESTIONS: CLEANUP FAILED, {order_id}")

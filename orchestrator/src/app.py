@@ -86,12 +86,22 @@ def checkout():
 
     except Exception as e:
         print(f"Order Rejected: {e}")
+        print(f"Current vector clock: {service.vc}\n")
 
         return {
             "orderId": order_id,
             "status": f"Order Rejected ({e})",
             "suggestedBooks": [],
         }
+
+    finally:
+        print("Cleaning order data")
+        cleanup_tasks = [
+            (service.clean_fraud_order, (order_id,)),
+            (service.clean_transaction_order, (order_id,)),
+            (service.clean_suggestion_order, (order_id,)),
+        ]
+        execute_parallel(cleanup_tasks)
 
 
 if __name__ == "__main__":

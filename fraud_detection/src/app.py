@@ -35,56 +35,74 @@ class FraudService(fraud_detection_grpc.FraudServiceServicer):
             local_vc[i] = max(local_vc[i], incoming_vc[i])
         local_vc[self.svc_idx] += 1
 
+    def clean_order(self, order_id, local_vc, incoming_vc):
+        if local_vc[self.svc_idx] <= incoming_vc[self.svc_idx]:
+            self.orders.pop(order_id)
+            return True
+        else:
+            return False
+
     def CheckCreditCard(self, request, context):
-        order_data = self.orders.get(request.order_id)
-        self.merge_and_increment(order_data["vc"], request.vc)
+        print(f"checking credit data of order {request.order_id}")
+        order_data = self.orders.get(request.order_id, None)
 
         response = fraud_detection.FraudResponse()
 
         if not order_data:
-            response.is_fraud = True
-            response.vc.extend(order_data["vc"])
+            response.result = "fail"
+            response.vc.extend(request.vc)
             return response
-        
-        print("credit")
-        print(response)
 
-        response.is_fraud = bool(
-            order_data["data"]["creditCard"]["number"].startswith("1111")
+        self.merge_and_increment(order_data["vc"], request.vc)
+
+        response.result = (
+            "fail"
+            if order_data["data"]["creditCard"]["number"].startswith("1111")
+            else "pass"
         )
-        print(response)
-        
+
         response.vc.extend(order_data["vc"])
-
-        print(response)
-
-
         return response
 
     def CheckUser(self, request, context):
-        order_data = self.orders.get(request.order_id)
-        self.merge_and_increment(order_data["vc"], request.vc)
+        print(f"checking user data of order {request.order_id}")
+        order_data = self.orders.get(request.order_id, None)
 
         response = fraud_detection.FraudResponse()
 
         if not order_data:
-            response.is_fraud = True
-            response.vc.extend(order_data["vc"])
+            response.result = "fail"
+            response.vc.extend(request.vc)
             return response
-        print("user")
-        print(response)
 
-        response.is_fraud = bool(
-            order_data["data"]["user"]["contact"].endswith("@example.com")
+        self.merge_and_increment(order_data["vc"], request.vc)
+
+        response.result = (
+            "fail"
+            if (order_data["data"]["user"]["contact"]).endswith("@example.com")
+            else "pass"
         )
 
-        print(response)
-
         response.vc.extend(order_data["vc"])
+        return response
 
-        print(response)
+    def CleanOrder(self, request, context):
+        print(f"cleaning order {request.order_id}")
+        order_data = self.orders.get(request.order_id, None)
 
+        response = fraud_detection.FraudResponse()
 
+        if not order_data:
+            response.result = "fail"
+            response.vc.extend(request.vc)
+            return response
+
+        response.result = (
+            "fail"
+            if not self.clean_order(request.order_id, order_data["vc"], request.vc)
+            else "pass"
+        )
+        response.vc.extend(order_data["vc"])
         return response
 
 

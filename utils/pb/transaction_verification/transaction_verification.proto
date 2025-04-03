@@ -8,9 +8,10 @@ package transaction;
 
 service TransactionVerificationService {
     rpc InitOrder(OrderRequest) returns (google.protobuf.Empty);
-    rpc VerifyUser(TransactionRequest) returns (TransactionVerificationResponse);
-    rpc VerifyAddress(TransactionRequest) returns (TransactionVerificationResponse);
-    rpc VerifyCreditCard(TransactionRequest) returns (TransactionVerificationResponse);
+    rpc VerifyUser(TransactionRequest) returns (TransactionResponse);
+    rpc VerifyAddress(TransactionRequest) returns (TransactionResponse);
+    rpc VerifyCreditCard(TransactionRequest) returns (TransactionResponse);
+    rpc CleanOrder(TransactionRequest) returns (TransactionResponse);
 }
 
 message OrderRequest{
@@ -23,7 +24,7 @@ message TransactionRequest {
     repeated int32 vc = 2;
 }
 
-message TransactionVerificationResponse {
-    bool is_verified = 1;
+message TransactionResponse {
+    string result = 1;
     repeated int32 vc = 2;
 }

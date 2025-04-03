@@ -38,41 +38,53 @@ class TransactionVerificationService(
             local_vc[i] = max(local_vc[i], incoming_vc[i])
         local_vc[self.svc_idx] += 1
 
+    def clean_order(self, order_id, local_vc, incoming_vc):
+        if local_vc[self.svc_idx] <= incoming_vc[self.svc_idx]:
+            self.orders.pop(order_id)
+            return True
+        else:
+            return False
+
     def VerifyUser(self, request, context):
         print(f"Verify user: Received order_id {request.order_id}\n")
         order_data = self.orders.get(request.order_id)
-        self.merge_and_increment(order_data["vc"], request.vc)
-
-        response = transaction.TransactionVerificationResponse()
+        response = transaction.TransactionResponse()
 
         if not order_data:
-            response.is_verified = False
-            response.vc.extend(order_data["vc"])
+            response.result = "fail"
+            response.vc.extend(request.vc)
             return response
 
-        response.is_verified = bool(
-            order_data["data"]["user"]["name"] and order_data["data"]["user"]["contact"]
+        self.merge_and_increment(order_data["vc"], request.vc)
+
+        response.result = (
+            "fail"
+            if order_data["data"]["user"]["name"] == ""
+            or order_data["data"]["user"]["contact"] == ""
+            else "pass"
         )
         response.vc.extend(order_data["vc"])
 
-        print(f"Verify user: Response {response.is_verified}\n")
-
+        print(f"Verify user: Response {response}\n")
         return response
 
     def VerifyAddress(self, request, context):
         print(f"Verify Address: Received order_id {request.order_id}\n")
         order_data = self.orders.get(request.order_id)
-        self.merge_and_increment(order_data["vc"], request.vc)
 
-        response = transaction.TransactionVerificationResponse()
+        response = transaction.TransactionResponse()
 
         if not order_data:
-            response.is_verified = False
-            response.vc.extend(order_data["vc"])
+            response.result = "fail"
+            response.vc.extend(request.vc)
             return response
 
-        response.is_verified = bool(
-            order_data["data"]["billingAddress"]["country"] == "USA"
+        self.merge_and_increment(order_data["vc"], request.vc)
+
+        response.result = (
+            "fail"
+            if order_data["data"]["billingAddress"]["country"] != "USA"
+            else "pass"
         )
         response.vc.extend(order_data["vc"])
 
@@ -83,22 +95,41 @@ class TransactionVerificationService(
     def VerifyCreditCard(self, request, context):
         print(f"Verify Credit Card: Received order_id {request.order_id}\n")
         order_data = self.orders.get(request.order_id)
-        self.merge_and_increment(order_data["vc"], request.vc)
 
-        response = transaction.TransactionVerificationResponse()
+        response = transaction.TransactionResponse()
 
         if not order_data:
-            response.is_verified = False
-            response.vc.extend(order_data["vc"])
+            response.result = "fail"
+            response.vc.extend(request.vc)
             return response
 
-        response.is_verified = bool(
-            len(order_data["data"]["creditCard"]["number"]) > 10
+        self.merge_and_increment(order_data["vc"], request.vc)
+
+        response.result = (
+            "fail" if len(order_data["data"]["creditCard"]["number"]) < 16 else "pass"
         )
         response.vc.extend(order_data["vc"])
 
         print(f"Verify Credit Card: Response {response}\n")
+        return response
 
+    def CleanOrder(self, request, context):
+        print(f"cleaning order {request.order_id}")
+        order_data = self.orders.get(request.order_id, None)
+
+        response = transaction.TransactionResponse()
+
+        if not order_data:
+            response.result = "fail"
+            response.vc.extend(request.vc)
+            return response
+
+        response.result = (
+            "fail"
+            if not self.clean_order(request.order_id, order_data["vc"], request.vc)
+            else "pass"
+        )
+        response.vc.extend(order_data["vc"])
         return response
 
 

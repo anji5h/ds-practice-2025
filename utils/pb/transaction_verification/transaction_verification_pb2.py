@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1etransaction_verification.proto\x12\x0btransaction\x1a\x1bgoogle/protobuf/empty.proto\"4\n\x0cOrderRequest\x12\x10\n\x08order_id\x18\x01 \x01(\t\x12\x12\n\norder_data\x18\x02 \x01(\t\"2\n\x12TransactionRequest\x12\x10\n\x08order_id\x18\x01 \x01(\t\x12\n\n\x02vc\x18\x02 \x03(\x05\"B\n\x1fTransactionVerificationResponse\x12\x13\n\x0bis_verified\x18\x01 \x01(\x08\x12\n\n\x02vc\x18\x02 \x03(\x05\x32\x80\x03\n\x1eTransactionVerificationService\x12>\n\tInitOrder\x12\x19.transaction.OrderRequest\x1a\x16.google.protobuf.Empty\x12[\n\nVerifyUser\x12\x1f.transaction.TransactionRequest\x1a,.transaction.TransactionVerificationResponse\x12^\n\rVerifyAddress\x12\x1f.transaction.TransactionRequest\x1a,.transaction.TransactionVerificationResponse\x12\x61\n\x10VerifyCreditCard\x12\x1f.transaction.TransactionRequest\x1a,.transaction.TransactionVerificationResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1etransaction_verification.proto\x12\x0btransaction\x1a\x1bgoogle/protobuf/empty.proto\"4\n\x0cOrderRequest\x12\x10\n\x08order_id\x18\x01 \x01(\t\x12\x12\n\norder_data\x18\x02 \x01(\t\"2\n\x12TransactionRequest\x12\x10\n\x08order_id\x18\x01 \x01(\t\x12\n\n\x02vc\x18\x02 \x03(\x05\"1\n\x13TransactionResponse\x12\x0e\n\x06result\x18\x01 \x01(\t\x12\n\n\x02vc\x18\x02 \x03(\x05\x32\xad\x03\n\x1eTransactionVerificationService\x12>\n\tInitOrder\x12\x19.transaction.OrderRequest\x1a\x16.google.protobuf.Empty\x12O\n\nVerifyUser\x12\x1f.transaction.TransactionRequest\x1a .transaction.TransactionResponse\x12R\n\rVerifyAddress\x12\x1f.transaction.TransactionRequest\x1a .transaction.TransactionResponse\x12U\n\x10VerifyCreditCard\x12\x1f.transaction.TransactionRequest\x1a .transaction.TransactionResponse\x12O\n\nCleanOrder\x12\x1f.transaction.TransactionRequest\x1a .transaction.TransactionResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -36,8 +36,8 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_ORDERREQUEST']._serialized_end=128
   _globals['_TRANSACTIONREQUEST']._serialized_start=130
   _globals['_TRANSACTIONREQUEST']._serialized_end=180
-  _globals['_TRANSACTIONVERIFICATIONRESPONSE']._serialized_start=182
-  _globals['_TRANSACTIONVERIFICATIONRESPONSE']._serialized_end=248
-  _globals['_TRANSACTIONVERIFICATIONSERVICE']._serialized_start=251
-  _globals['_TRANSACTIONVERIFICATIONSERVICE']._serialized_end=635
+  _globals['_TRANSACTIONRESPONSE']._serialized_start=182
+  _globals['_TRANSACTIONRESPONSE']._serialized_end=231
+  _globals['_TRANSACTIONVERIFICATIONSERVICE']._serialized_start=234
+  _globals['_TRANSACTIONVERIFICATIONSERVICE']._serialized_end=663
 # @@protoc_insertion_point(module_scope)
