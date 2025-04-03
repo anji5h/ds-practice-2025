@@ -22,7 +22,7 @@ def checkout():
     service = OrchestratorService()
 
     try:
-        print(f"Received new checkout request")
+        print(f"Received new checkout request\n")
 
         request_data = request.get_json()
 
@@ -31,48 +31,65 @@ def checkout():
 
         results = queue.Queue()
 
-        print(f"Caching order data")
-        print(f"Creating worker threads")
+        print(f"Caching order data\n")
         threads = [
+            threading.Thread(target=service.fraud_init, args=(order_id, order_data)),
             threading.Thread(
-                target=service.fraud_init,
-                args=(order_id, order_data),
+                target=service.transaction_init, args=(order_id, order_data)
             ),
             threading.Thread(
-                target=service.transaction_init,
-                args=(order_id, order_data),
-            ),
-            threading.Thread(
-                target=service.suggestion_init,
-                args=(order_id, order_data),
+                target=service.suggestion_init, args=(order_id, order_data)
             ),
         ]
 
-        print(f"Starting worker threads")
         for thread in threads:
             thread.start()
 
         for thread in threads:
             thread.join()
-        print(f"Threads processing completed")
+        print(f"Order caching completed\n")
 
-        results = {}
-        while not results.empty():
-            key, value = results.get()
-            results[key] = value
-        print(f"Final results: {results}")
+        print("Verifying order data\n")
+        threads = [
+            threading.Thread(target=service.verify_user, args=(order_id,)),
+            threading.Thread(target=service.verify_credit_card, args=(order_id,)),
+            threading.Thread(target=service.verify_address, args=(order_id,)),
+        ]
 
-        status = "Order Approved"
-        if results.get("is_fraud", False):
-            status = "Order Rejected (Fraud detected)"
-        elif not results.get("is_verified", False):
-            status = "Order Rejected (Transaction verification failed)"
+        for thread in threads:
+            thread.start()
 
-        print(f"Sending checkout response to user")
+        for thread in threads:
+            thread.join()
+
+        print("Verfying complete\n")
+        print(f"Current vector clock: {service.vc}\n")
+
+        print("Checking order data\n")
+        threads = [
+            threading.Thread(target=service.check_user, args=(order_id,)),
+            threading.Thread(target=service.check_credit_card, args=(order_id,)),
+        ]
+
+        for thread in threads:
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+
+        print("Checking complete\n")
+        print(f"Current vector clock: {service.vc}\n")
+
+        print("Getting Book Suggestions\n")
+        suggestions = service.get_suggestions(order_id)
+        print("Getting Book Suggestion Complete\n")
+        print(f"Current vector clock: {service.vc}\n")
+
+        print(f"Sending checkout response to user\n")
 
         return {
             "orderId": "12345",
-            "status": status,
+            "status": "Order Approved",
             "suggestedBooks": [
                 {
                     "bookId": str(i + 1),
@@ -80,19 +97,13 @@ def checkout():
                     "author": book["author"],
                     "link": book["link"],
                 }
-                for i, book in enumerate(results.get("suggestions", []))
+                for i, book in enumerate(suggestions)
             ],
         }
 
-    except json.JSONDecodeError:
-        print(f"ERROR: Invalid JSON received")
-        return jsonify({"error": "Invalid JSON"}), 400
-    except KeyError as e:
-        print(f"ERROR: Missing field {str(e)}")
-        return jsonify({"error": f"Missing required field: {str(e)}"}), 400
     except Exception as e:
-        print(f"CRITICAL ERROR: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        print(f"Order Rejected: {e}")
+        return {"orderId": order_id, "status": "Order Rejected", "error": str(e)}
 
 
 if __name__ == "__main__":

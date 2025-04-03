@@ -5,8 +5,10 @@ import grpc
 import requests
 from concurrent import futures
 
-FILE = __file__ if '__file__' in globals() else os.getenv("PYTHONFILE", "")
-suggestion_grpc_path = os.path.abspath(os.path.join(FILE, '../../../utils/pb/suggestions'))
+FILE = __file__ if "__file__" in globals() else os.getenv("PYTHONFILE", "")
+suggestion_grpc_path = os.path.abspath(
+    os.path.join(FILE, "../../../utils/pb/suggestions")
+)
 sys.path.insert(0, suggestion_grpc_path)
 
 # Import gRPC generated classes
@@ -16,6 +18,7 @@ from google.protobuf import empty_pb2
 
 # Third-party book API (Example: Open Library API)
 BOOK_API_URL = "https://openlibrary.org/search.json"
+
 
 class SuggestionService(suggestion_grpc.SuggestionServiceServicer):
     def __init__(self, svc_idx=2, total_svcs=3):
@@ -33,25 +36,24 @@ class SuggestionService(suggestion_grpc.SuggestionServiceServicer):
             local_vc[i] = max(local_vc[i], incoming_vc[i])
         local_vc[self.svc_idx] += 1
 
-    # Create an RPC function to get suggestions
     def GetSuggestions(self, request, context):
         print(f"Received order_id {request.order_id}")
 
         order_data = self.orders.get(request.order_id)
         self.merge_and_increment(order_data["vc"], request.vc)
-        
+
         response = suggestion.SuggestionsResponse()
-    
+
         if not order_data:
             response.suggestedBooks = []
-            response.vc = order_data["vc"]
+            response.vc.extend(order_data["vc"])
             return response
 
-        query = ";".join([item["name"] for item in order_data["items"]])
+        query = ";".join([item["name"] for item in order_data["data"]["items"]])
         books = self.fetch_books(query)
 
         response.suggestedBooks.extend(books)
-        response.vc = order_data["vc"]
+        response.vc.extend(order_data["vc"])
 
         print(f"Returning {len(books)} suggestions for query '{query}'")
         return response
@@ -69,7 +71,7 @@ class SuggestionService(suggestion_grpc.SuggestionServiceServicer):
                     title=doc.get("title", "Unknown"),
                     author=doc["author_name"][0] if "author_name" in doc else "Unknown",
                     description="N/A",
-                    link=f"https://openlibrary.org{doc.get('key', '')}"
+                    link=f"https://openlibrary.org{doc.get('key', '')}",
                 )
                 books.append(book)
 
@@ -78,6 +80,7 @@ class SuggestionService(suggestion_grpc.SuggestionServiceServicer):
         except Exception as e:
             print(f"Error fetching books: {e}")
             return []
+
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -89,6 +92,7 @@ def serve():
 
     print(f"Server started. Listening on port {port}.")
     server.wait_for_termination()
+
 
 if __name__ == "__main__":
     serve()

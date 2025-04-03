@@ -45,7 +45,7 @@ class OrchestratorService:
 
     def fraud_init(self, order_id, order_data):
         try:
-            print(f"Starting fraud init request")
+            print(f"Starting fraud init request\n")
             with grpc.insecure_channel(self.fraud_detection_url) as channel:
                 stub = fraud_detection_grpc.FraudServiceStub(channel)
                 stub.InitOrder(
@@ -59,36 +59,37 @@ class OrchestratorService:
             raise Exception(f"FRAUD_DETECTION: CACHING FAILED")
 
     def check_user(self, order_id):
-        print(f"Starting check user request, order_id: {order_id}")
+        print(f"Starting check user request, order_id: {order_id}\n")
         with grpc.insecure_channel(self.fraud_detection_url) as channel:
             stub = fraud_detection_grpc.FraudServiceStub(channel)
-            response = stub.CheckUser(fraud_detection.FraudRequest(order_id=order_id, vc=self.vc))
+            response = stub.CheckUser(
+                fraud_detection.FraudRequest(order_id=order_id, vc=self.vc)
+            )
             print(f"fraud_detection: check_user complete")
             response_dict = MessageToDict(response)
-
-            if response_dict["is_fraud"]:
+            if response_dict["isFraud"]:
                 raise Exception(f"FRAUD_DETECTION: CHECK USER FAILED")
 
             self.merge_and_increment(self.vc, response_dict["vc"])
 
     def check_credit_card(self, order_id):
-        print(f"Starting check credit card request, order_id: {order_id}")
+        print(f"Starting check credit card request, order_id: {order_id}\n")
         with grpc.insecure_channel(self.fraud_detection_url) as channel:
             stub = fraud_detection_grpc.FraudServiceStub(channel)
             response = stub.CheckCreditCard(
                 fraud_detection.FraudRequest(order_id=order_id, vc=self.vc)
             )
-            print(f"fraud_detection: check credit card complete")
+            print(f"fraud_detection: check credit card complete\n")
             response_dict = MessageToDict(response)
-
-            if response_dict["is_fraud"]:
+            print(response_dict)
+            if response_dict["isFraud"]:
                 raise Exception(f"FRAUD_DETECTION: CHECK CREDIT CARD FAILED")
 
             self.merge_and_increment(self.vc, response_dict["vc"])
 
     def transaction_init(self, order_id, order_data):
         try:
-            print(f"Starting transaction init request")
+            print(f"Starting transaction init request\n")
             with grpc.insecure_channel(self.transaction_verification_url) as channel:
                 stub = transaction_verification_grpc.TransactionVerificationServiceStub(
                     channel
@@ -104,59 +105,65 @@ class OrchestratorService:
             raise Exception(f"TRANSACTION VERIFICATION: CACHING FAILED")
 
     def verify_user(self, order_id):
-        print(f"Starting transaction init request")
+        print(f"Starting transaction verify user request\n")
         with grpc.insecure_channel(self.transaction_verification_url) as channel:
             stub = transaction_verification_grpc.TransactionVerificationServiceStub(
                 channel
             )
             response = stub.VerifyUser(
-                transaction_verification.TransactionRequest(order_id=order_id, vc=self.vc)
+                transaction_verification.TransactionRequest(
+                    order_id=order_id, vc=self.vc
+                )
             )
             print(f"transaction_verification: verify user complete")
             response_dict = MessageToDict(response)
 
-            if response_dict["is_verified"]:
+            if not response_dict["isVerified"]:
                 raise Exception(f"TRANSACTION VERIFICATION: USER VERIFY FAILED")
 
             self.merge_and_increment(self.vc, response_dict["vc"])
 
     def verify_credit_card(self, order_id):
-        print(f"Starting transaction init request")
+        print(f"Starting transaction verify credit card request\n")
         with grpc.insecure_channel(self.transaction_verification_url) as channel:
             stub = transaction_verification_grpc.TransactionVerificationServiceStub(
                 channel
             )
             response = stub.VerifyCreditCard(
-                transaction_verification.TransactionRequest(order_id=order_id, vc=self.vc)
+                transaction_verification.TransactionRequest(
+                    order_id=order_id, vc=self.vc
+                )
             )
-            print(f"transaction_verification: verify credit card complete")
+            print(f"transaction_verification: verify credit card complete\n")
             response_dict = MessageToDict(response)
 
-            if response_dict["is_verified"]:
+            if not response_dict["isVerified"]:
                 raise Exception(f"TRANSACTION VERIFICATION: CREDIT CARD VERIFY FAILED")
 
             self.merge_and_increment(self.vc, response_dict["vc"])
 
     def verify_address(self, order_id):
-        print(f"Starting transaction init request")
+        print(f"Starting transaction verify address request\n")
         with grpc.insecure_channel(self.transaction_verification_url) as channel:
             stub = transaction_verification_grpc.TransactionVerificationServiceStub(
                 channel
             )
             response = stub.VerifyAddress(
-                transaction_verification.TransactionRequest(order_id=order_id, vc=self.vc)
+                transaction_verification.TransactionRequest(
+                    order_id=order_id, vc=self.vc
+                )
             )
-            print(f"transaction_verification: verify address complete")
+            print(f"transaction_verification: verify address complete\n")
             response_dict = MessageToDict(response)
 
-            if response_dict["is_verified"]:
+            if not response_dict["isVerified"]:
                 raise Exception(f"TRANSACTION VERIFICATION: ADDRESS VERIFY FAILED")
 
             self.merge_and_increment(self.vc, response_dict["vc"])
 
     def suggestion_init(self, order_id, order_data):
         try:
-            print(f"Starting book init request")
+            print(f"Starting book init request\n")
             with grpc.insecure_channel(self.suggestions_url) as channel:
                 stub = suggestions_grpc.SuggestionServiceStub(channel)
                 stub.InitOrder(
@@ -167,15 +174,15 @@ class OrchestratorService:
             print(f"{self.suggestion_init.__name__}{str(e)}")
             raise Exception(f"SUGGESTIONS: CACHING FAILED")
 
-    def get_suggestions(self, order_id, result):
+    def get_suggestions(self, order_id):
         try:
-            print(f"Starting book suggestions request")
-            with grpc.insecure_channel() as channel:
+            print(f"Starting book suggestions request\n")
+            with grpc.insecure_channel(self.suggestions_url) as channel:
                 stub = suggestions_grpc.SuggestionServiceStub(channel)
                 response = stub.GetSuggestions(
-                    suggestions.SuggestionsRequest(order_id=order_id, vc=self.vc)
+                    suggestions.SuggestionRequest(order_id=order_id, vc=self.vc)
                 )
-                print(f"suggestions: get_suggestions complete")
+                print(f"suggestions: get_suggestions complete\n")
 
                 response_dict = MessageToDict(response)
                 self.merge_and_increment(self.vc, response_dict["vc"])

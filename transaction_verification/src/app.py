@@ -39,7 +39,7 @@ class TransactionVerificationService(
         local_vc[self.svc_idx] += 1
 
     def VerifyUser(self, request, context):
-        print(f"Received order_id {request.order_id}")
+        print(f"Verify user: Received order_id {request.order_id}\n")
         order_data = self.orders.get(request.order_id)
         self.merge_and_increment(order_data["vc"], request.vc)
 
@@ -47,18 +47,21 @@ class TransactionVerificationService(
 
         if not order_data:
             response.is_verified = False
-            response.vc = order_data["vc"]
+            response.vc.extend(order_data["vc"])
             return response
 
-        response.is_verified = (
-            order_data["user"]["name"] and order_data["user"]["contact"]
+        print(order_data["data"])
+        response.is_verified = bool(
+            order_data["data"]["user"]["name"] and order_data["data"]["user"]["contact"]
         )
-        response.vc = order_data["vc"]
+        response.vc.extend(order_data["vc"])
+
+        print(f"Verify user: Response {response.is_verified}\n")
 
         return response
 
     def VerifyAddress(self, request, context):
-        print(f"Received order_id {request.order_id}")
+        print(f"Verify Address: Received order_id {request.order_id}\n")
         order_data = self.orders.get(request.order_id)
         self.merge_and_increment(order_data["vc"], request.vc)
 
@@ -66,16 +69,20 @@ class TransactionVerificationService(
 
         if not order_data:
             response.is_verified = False
-            response.vc = order_data["vc"]
+            response.vc.extend(order_data["vc"])
             return response
 
-        response.is_verified = order_data["billingAddress"]["country"] == "USA"
-        response.vc = order_data["vc"]
+        response.is_verified = bool(
+            order_data["data"]["billingAddress"]["country"] == "USA"
+        )
+        response.vc.extend(order_data["vc"])
+
+        print(f"Verify Address: Response {response}\n")
 
         return response
 
     def VerifyCreditCard(self, request, context):
-        print(f"Received order_id {request.order_id}")
+        print(f"Verify Credit Card: Received order_id {request.order_id}\n")
         order_data = self.orders.get(request.order_id)
         self.merge_and_increment(order_data["vc"], request.vc)
 
@@ -83,13 +90,18 @@ class TransactionVerificationService(
 
         if not order_data:
             response.is_verified = False
-            response.vc = order_data["vc"]
+            response.vc.extend(order_data["vc"])
             return response
 
-        response.is_verified = len(order_data["creditCard"]["number"]) > 10
-        response.vc = order_data["vc"]
+        response.is_verified = bool(
+            len(order_data["data"]["creditCard"]["number"]) > 10
+        )
+        response.vc.extend(order_data["vc"])
+
+        print(f"Verify Credit Card: Response {response}\n")
 
         return response
+
 
 def serve():
     # Create a gRPC server

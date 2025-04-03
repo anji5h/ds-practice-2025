@@ -1,6 +1,7 @@
 import json
 import sys
 import os
+from concurrent import futures
 
 # This set of lines are needed to import the gRPC stubs.
 # The path of the stubs is relative to the current file, or absolute inside the container.
@@ -14,7 +15,6 @@ import fraud_detection_pb2 as fraud_detection
 import fraud_detection_pb2_grpc as fraud_detection_grpc
 
 import grpc
-from concurrent import futures
 from google.protobuf import empty_pb2
 
 
@@ -44,13 +44,13 @@ class FraudService(fraud_detection_grpc.FraudServiceServicer):
 
         if not order_data:
             response.is_fraud = True
-            response.vc = order_data["vc"]
+            response.vc.extend(order_data["vc"])
             return response
 
-        credit_card_no: str = order_data["creditCard"]["number"]
+        credit_card = order_data["data"]["creditCard"]["number"]
 
-        response.is_fraud = credit_card_no.startswith("1111")
-        response.vc = order_data["vc"]
+        response.is_fraud = bool(credit_card.startswith("1111"))
+        response.vc.extend(order_data["vc"])
 
         return response
 
@@ -62,12 +62,13 @@ class FraudService(fraud_detection_grpc.FraudServiceServicer):
 
         if not order_data:
             response.is_fraud = True
-            response.vc = order_data["vc"]
+            response.vc.extend(order_data["vc"])
             return response
 
-        user_email = order_data["user"]["contact"]
-        response.is_fraud = not user_email.lower().endswith("@gmail.com")
-        response.vc = order_data["vc"]
+        user_email = order_data["data"]["user"]["contact"]
+
+        response.is_fraud = bool(user_email.lower().endswith("@example.com"))
+        response.vc.extend(order_data["vc"])
 
         return response
 
