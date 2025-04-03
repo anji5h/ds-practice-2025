@@ -50,7 +50,6 @@ class TransactionVerificationService(
             response.vc.extend(order_data["vc"])
             return response
 
-        print(order_data["data"])
         response.is_verified = bool(
             order_data["data"]["user"]["name"] and order_data["data"]["user"]["contact"]
         )

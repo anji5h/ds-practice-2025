@@ -65,7 +65,7 @@ class OrchestratorService:
             response = stub.CheckUser(
                 fraud_detection.FraudRequest(order_id=order_id, vc=self.vc)
             )
-            print(f"fraud_detection: check_user complete")
+            print(f"fraud_detection: check_user complete\n")
             response_dict = MessageToDict(response)
             if response_dict["isFraud"]:
                 raise Exception(f"FRAUD_DETECTION: CHECK USER FAILED")
@@ -79,11 +79,10 @@ class OrchestratorService:
             response = stub.CheckCreditCard(
                 fraud_detection.FraudRequest(order_id=order_id, vc=self.vc)
             )
-            print(f"fraud_detection: check credit card complete\n")
+            print(f"fraud_detection: check_user complete\n")
             response_dict = MessageToDict(response)
-            print(response_dict)
             if response_dict["isFraud"]:
-                raise Exception(f"FRAUD_DETECTION: CHECK CREDIT CARD FAILED")
+                raise Exception(f"FRAUD_DETECTION: CHECK USER FAILED")
 
             self.merge_and_increment(self.vc, response_dict["vc"])
 

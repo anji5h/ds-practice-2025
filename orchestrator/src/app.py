@@ -1,5 +1,3 @@
-import queue
-import threading
 import uuid
 from services import OrchestratorService
 from concurrent.futures import ThreadPoolExecutor
@@ -19,7 +17,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 
 def execute_parallel(tasks):
-    with ThreadPoolExecutor(max_workers=6) as executor:
+    with ThreadPoolExecutor(max_workers=8) as executor:
         futures = [executor.submit(task[0], *task[1]) for task in tasks]
         for future in futures:
             future.result()
@@ -36,8 +34,6 @@ def checkout():
 
         order_data = json.dumps(request_data)
         order_id = str(uuid.uuid4())
-
-        results = queue.Queue()
 
         print(f"Caching order data\n")
         init_tasks = [
@@ -60,8 +56,8 @@ def checkout():
 
         print("Checking order data\n")
         fraud_tasks = [
-            (service.check_user, (order_id,)),
             (service.check_credit_card, (order_id,)),
+            (service.check_user, (order_id,)),
         ]
         execute_parallel(fraud_tasks)
         print("Checking complete\n")
@@ -89,11 +85,11 @@ def checkout():
         }
 
     except Exception as e:
-        print(f"Order Rejected: {str(e)}")
-        
-        {
+        print(f"Order Rejected: {e}")
+
+        return {
             "orderId": order_id,
-            "status": "Order Rejected",
+            "status": f"Order Rejected ({e})",
             "suggestedBooks": [],
         }
 
