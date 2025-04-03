@@ -47,9 +47,9 @@ class FraudService(fraud_detection_grpc.FraudServiceServicer):
             response.vc.extend(order_data["vc"])
             return response
 
-        credit_card = order_data["data"]["creditCard"]["number"]
-
-        response.is_fraud = bool(credit_card.startswith("1111"))
+        response.is_fraud = bool(
+            order_data["data"]["creditCard"]["number"].startswith("1111")
+        )
         response.vc.extend(order_data["vc"])
 
         return response
@@ -65,9 +65,9 @@ class FraudService(fraud_detection_grpc.FraudServiceServicer):
             response.vc.extend(order_data["vc"])
             return response
 
-        user_email = order_data["data"]["user"]["contact"]
-
-        response.is_fraud = bool(user_email.lower().endswith("@example.com"))
+        response.is_fraud = bool(
+            order_data["data"]["user"]["contact"].endswith("@example.com")
+        )
         response.vc.extend(order_data["vc"])
 
         return response

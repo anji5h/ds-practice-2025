@@ -2,6 +2,7 @@ import queue
 import threading
 import uuid
 from services import OrchestratorService
+from concurrent.futures import ThreadPoolExecutor
 
 # Import Flask.
 # Flask is a web framework for Python.
@@ -15,6 +16,13 @@ import json
 app = Flask(__name__)
 # Enable CORS for the app.
 CORS(app, resources={r"/*": {"origins": "*"}})
+
+
+def execute_parallel(tasks):
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        futures = [executor.submit(task[0], *task[1]) for task in tasks]
+        for future in futures:
+            future.result()
 
 
 @app.route("/checkout", methods=["POST"])
@@ -32,51 +40,30 @@ def checkout():
         results = queue.Queue()
 
         print(f"Caching order data\n")
-        threads = [
-            threading.Thread(target=service.fraud_init, args=(order_id, order_data)),
-            threading.Thread(
-                target=service.transaction_init, args=(order_id, order_data)
-            ),
-            threading.Thread(
-                target=service.suggestion_init, args=(order_id, order_data)
-            ),
+        init_tasks = [
+            (service.fraud_init, (order_id, order_data)),
+            (service.transaction_init, (order_id, order_data)),
+            (service.suggestion_init, (order_id, order_data)),
         ]
-
-        for thread in threads:
-            thread.start()
-
-        for thread in threads:
-            thread.join()
+        execute_parallel(init_tasks)
         print(f"Order caching completed\n")
 
         print("Verifying order data\n")
-        threads = [
-            threading.Thread(target=service.verify_user, args=(order_id,)),
-            threading.Thread(target=service.verify_credit_card, args=(order_id,)),
-            threading.Thread(target=service.verify_address, args=(order_id,)),
+        verify_tasks = [
+            (service.verify_user, (order_id,)),
+            (service.verify_credit_card, (order_id,)),
+            (service.verify_address, (order_id,)),
         ]
-
-        for thread in threads:
-            thread.start()
-
-        for thread in threads:
-            thread.join()
-
+        execute_parallel(verify_tasks)
         print("Verfying complete\n")
         print(f"Current vector clock: {service.vc}\n")
 
         print("Checking order data\n")
-        threads = [
-            threading.Thread(target=service.check_user, args=(order_id,)),
-            threading.Thread(target=service.check_credit_card, args=(order_id,)),
+        fraud_tasks = [
+            (service.check_user, (order_id,)),
+            (service.check_credit_card, (order_id,)),
         ]
-
-        for thread in threads:
-            thread.start()
-
-        for thread in threads:
-            thread.join()
-
+        execute_parallel(fraud_tasks)
         print("Checking complete\n")
         print(f"Current vector clock: {service.vc}\n")
 
@@ -88,7 +75,7 @@ def checkout():
         print(f"Sending checkout response to user\n")
 
         return {
-            "orderId": "12345",
+            "orderId": order_id,
             "status": "Order Approved",
             "suggestedBooks": [
                 {
@@ -102,8 +89,13 @@ def checkout():
         }
 
     except Exception as e:
-        print(f"Order Rejected: {e}")
-        return {"orderId": order_id, "status": "Order Rejected", "error": str(e)}
+        print(f"Order Rejected: {str(e)}")
+        
+        {
+            "orderId": order_id,
+            "status": "Order Rejected",
+            "suggestedBooks": [],
+        }
 
 
 if __name__ == "__main__":
