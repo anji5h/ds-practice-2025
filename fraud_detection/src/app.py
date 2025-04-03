@@ -1,3 +1,4 @@
+import json
 import sys
 import os
 
@@ -14,6 +15,7 @@ import fraud_detection_pb2_grpc as fraud_detection_grpc
 
 import grpc
 from concurrent import futures
+from google.protobuf import empty_pb2
 
 
 # Create a class to define the server functions, derived from
@@ -24,25 +26,49 @@ class FraudService(fraud_detection_grpc.FraudServiceServicer):
         self.total_svcs = total_svcs
         self.orders = {}
 
-    def InitOrder(self, order_id, data):
-        # Initialize an order with an empty vector clock for tracking
-        self.orders[order_id] = {"data": data, "vc": [0] * self.total_svcs}
+    def InitOrder(self, request, context):
+        data = json.loads(request.order_data)
+        self.orders[request.order_id] = {"data": data, "vc": [0] * self.total_svcs}
+        return empty_pb2.Empty()
 
     def merge_and_increment(self, local_vc, incoming_vc):
-        # Merge the incoming vector clock with the local one and increment the current service's slot
         for i in range(self.total_svcs):
-            local_vc[i] = max(local_vc[i], incoming_vc[i])  # Merge the clocks
-        local_vc[self.svc_idx] += 1  # Increment this service's vector clock slot
+            local_vc[i] = max(local_vc[i], incoming_vc[i])
+        local_vc[self.svc_idx] += 1
 
-    # Create an RPC function to check fraud
-    def CheckFraud(self, request, context):
-        # Create a FraudResponse object
+    def CheckCreditCard(self, request, context):
+        order_data = self.orders.get(request.order_id)
+        self.merge_and_increment(order_data["vc"], request.vc)
+
         response = fraud_detection.FraudResponse()
-        # Set the is_fraud of the response object
-        response.is_fraud = request.number.startswith("1111")
-        # Print the fraud result
-        print(f"Fraud check result for card: XXXX-XXXX-XXXX-{request.number[-4:]}")
-        # Return the response object
+
+        if not order_data:
+            response.is_fraud = True
+            response.vc = order_data["vc"]
+            return response
+
+        credit_card_no: str = order_data["creditCard"]["number"]
+
+        response.is_fraud = credit_card_no.startswith("1111")
+        response.vc = order_data["vc"]
+
+        return response
+
+    def CheckUser(self, request, context):
+        order_data = self.orders.get(request.order_id)
+        self.merge_and_increment(order_data["vc"], request.vc)
+
+        response = fraud_detection.FraudResponse()
+
+        if not order_data:
+            response.is_fraud = True
+            response.vc = order_data["vc"]
+            return response
+
+        user_email = order_data["user"]["contact"]
+        response.is_fraud = not user_email.lower().endswith("@gmail.com")
+        response.vc = order_data["vc"]
+
         return response
 
 

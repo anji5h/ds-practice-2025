@@ -40,8 +40,13 @@ class FraudServiceStub(object):
                 request_serializer=fraud__detection__pb2.OrderRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
-        self.CheckFraud = channel.unary_unary(
-                '/fraud.FraudService/CheckFraud',
+        self.CheckUser = channel.unary_unary(
+                '/fraud.FraudService/CheckUser',
+                request_serializer=fraud__detection__pb2.FraudRequest.SerializeToString,
+                response_deserializer=fraud__detection__pb2.FraudResponse.FromString,
+                _registered_method=True)
+        self.CheckCreditCard = channel.unary_unary(
+                '/fraud.FraudService/CheckCreditCard',
                 request_serializer=fraud__detection__pb2.FraudRequest.SerializeToString,
                 response_deserializer=fraud__detection__pb2.FraudResponse.FromString,
                 _registered_method=True)
@@ -56,7 +61,13 @@ class FraudServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def CheckFraud(self, request, context):
+    def CheckUser(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CheckCreditCard(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -70,8 +81,13 @@ def add_FraudServiceServicer_to_server(servicer, server):
                     request_deserializer=fraud__detection__pb2.OrderRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
-            'CheckFraud': grpc.unary_unary_rpc_method_handler(
-                    servicer.CheckFraud,
+            'CheckUser': grpc.unary_unary_rpc_method_handler(
+                    servicer.CheckUser,
+                    request_deserializer=fraud__detection__pb2.FraudRequest.FromString,
+                    response_serializer=fraud__detection__pb2.FraudResponse.SerializeToString,
+            ),
+            'CheckCreditCard': grpc.unary_unary_rpc_method_handler(
+                    servicer.CheckCreditCard,
                     request_deserializer=fraud__detection__pb2.FraudRequest.FromString,
                     response_serializer=fraud__detection__pb2.FraudResponse.SerializeToString,
             ),
@@ -114,7 +130,7 @@ class FraudService(object):
             _registered_method=True)
 
     @staticmethod
-    def CheckFraud(request,
+    def CheckUser(request,
             target,
             options=(),
             channel_credentials=None,
@@ -127,7 +143,34 @@ class FraudService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/fraud.FraudService/CheckFraud',
+            '/fraud.FraudService/CheckUser',
+            fraud__detection__pb2.FraudRequest.SerializeToString,
+            fraud__detection__pb2.FraudResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CheckCreditCard(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/fraud.FraudService/CheckCreditCard',
             fraud__detection__pb2.FraudRequest.SerializeToString,
             fraud__detection__pb2.FraudResponse.FromString,
             options,

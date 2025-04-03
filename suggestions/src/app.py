@@ -1,6 +1,6 @@
+import json
 import sys
 import os
-import logging
 import grpc
 import requests
 from concurrent import futures
@@ -9,14 +9,10 @@ FILE = __file__ if '__file__' in globals() else os.getenv("PYTHONFILE", "")
 suggestion_grpc_path = os.path.abspath(os.path.join(FILE, '../../../utils/pb/suggestions'))
 sys.path.insert(0, suggestion_grpc_path)
 
-
 # Import gRPC generated classes
 import suggestions_pb2 as suggestion
 import suggestions_pb2_grpc as suggestion_grpc
-
-# Set up logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+from google.protobuf import empty_pb2
 
 # Third-party book API (Example: Open Library API)
 BOOK_API_URL = "https://openlibrary.org/search.json"
@@ -27,52 +23,60 @@ class SuggestionService(suggestion_grpc.SuggestionServiceServicer):
         self.total_svcs = total_svcs
         self.orders = {}
 
-    def InitOrder(self, order_id, data):
-        # Initialize an order with an empty vector clock for tracking
-        self.orders[order_id] = {"data": data, "vc": [0] * self.total_svcs}
+    def InitOrder(self, request, context):
+        data = json.loads(request.order_data)
+        self.orders[request.order_id] = {"data": data, "vc": [0] * self.total_svcs}
+        return empty_pb2.Empty()
 
     def merge_and_increment(self, local_vc, incoming_vc):
-        # Merge the incoming vector clock with the local one and increment the current service's slot
         for i in range(self.total_svcs):
-            local_vc[i] = max(local_vc[i], incoming_vc[i])  # Merge the clocks
-        local_vc[self.svc_idx] += 1  # Increment this service's vector clock slot
+            local_vc[i] = max(local_vc[i], incoming_vc[i])
+        local_vc[self.svc_idx] += 1
 
     # Create an RPC function to get suggestions
-
     def GetSuggestions(self, request, context):
-        query = request.query
-        logger.info(f"Received request for suggestions based on query: {query}")
+        print(f"Received order_id {request.order_id}")
+
+        order_data = self.orders.get(request.order_id)
+        self.merge_and_increment(order_data["vc"], request.vc)
         
+        response = suggestion.SuggestionsResponse()
+    
+        if not order_data:
+            response.suggestedBooks = []
+            response.vc = order_data["vc"]
+            return response
+
+        query = ";".join([item["name"] for item in order_data["items"]])
         books = self.fetch_books(query)
 
-        # Prepare response
-        response = suggestion.SuggestionsResponse()
         response.suggestedBooks.extend(books)
+        response.vc = order_data["vc"]
 
-        logger.info(f"Returning {len(books)} suggestions for query '{query}'")
+        print(f"Returning {len(books)} suggestions for query '{query}'")
         return response
 
     def fetch_books(self, query):
         try:
-            logger.debug(f"Fetching books from API for query: {query}")
+            print(f"Fetching books from API for query: {query}")
             response = requests.get(BOOK_API_URL, params={"q": query, "limit": 5})
-            response.raise_for_status()  # Raise an error for non-2xx status codes
+            response.raise_for_status()
             data = response.json()
 
             books = []
-            for doc in data.get("docs", [])[:5]:  # Get top 5 results
+            for doc in data.get("docs", [])[:5]:
                 book = suggestion.Book(
                     title=doc.get("title", "Unknown"),
                     author=doc["author_name"][0] if "author_name" in doc else "Unknown",
-                    description="N/A",  # Open Library doesn't provide descriptions
+                    description="N/A",
                     link=f"https://openlibrary.org{doc.get('key', '')}"
                 )
                 books.append(book)
 
-            logger.debug(f"Fetched {len(books)} books for query '{query}'")
+            print(f"Fetched {len(books)} books for query '{query}'")
             return books
         except Exception as e:
-            logger.error(f"Error fetching books: {e}")
+            print(f"Error fetching books: {e}")
             return []
 
 def serve():
@@ -83,7 +87,7 @@ def serve():
     server.add_insecure_port(f"[::]:{port}")
     server.start()
 
-    logger.info(f"Server started. Listening on port {port}.")
+    print(f"Server started. Listening on port {port}.")
     server.wait_for_termination()
 
 if __name__ == "__main__":

@@ -1,36 +1,7 @@
 import queue
-import sys
-import os
 import threading
-
-# This set of lines are needed to import the gRPC stubs.
-# The path of the stubs is relative to the current file, or absolute inside the container.
-# Change these lines only if strictly needed.
-FILE = __file__ if "__file__" in globals() else os.getenv("PYTHONFILE", "")
-
-fraud_detection_grpc_path = os.path.abspath(
-    os.path.join(FILE, "../../../utils/pb/fraud_detection")
-)
-transaction_verification_grpc_path = os.path.abspath(
-    os.path.join(FILE, "../../../utils/pb/transaction_verification")
-)
-suggestions_grpc_path = os.path.abspath(
-    os.path.join(FILE, "../../../utils/pb/suggestions")
-)
-
-sys.path.insert(0, fraud_detection_grpc_path)
-sys.path.insert(1, transaction_verification_grpc_path)
-sys.path.insert(2, suggestions_grpc_path)
-
-import fraud_detection_pb2 as fraud_detection
-import fraud_detection_pb2_grpc as fraud_detection_grpc
-import transaction_verification_pb2 as transaction_verification
-import transaction_verification_pb2_grpc as transaction_verification_grpc
-import suggestions_pb2 as suggestions
-import suggestions_pb2_grpc as suggestions_grpc
-
-import grpc
-from google.protobuf.json_format import MessageToDict
+import uuid
+from services import OrchestratorService
 
 # Import Flask.
 # Flask is a web framework for Python.
@@ -46,85 +17,34 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 
-def call_fraud_detection(number, result):
-    try:
-        print(f"Starting fraud check request")
-        with grpc.insecure_channel("fraud_detection:50051") as channel:
-            stub = fraud_detection_grpc.FraudServiceStub(channel)
-            response = stub.CheckFraud(fraud_detection.FraudRequest(number=number))
-            print(f"Fraud check result recieved")
-            result.put(("is_fraud", response.is_fraud))
-    except Exception as e:
-        print(f"ERROR in fraud detection: {str(e)}")
-        result.put(("is_fraud", True))
-
-
-def call_transaction_verification(cvv, result):
-    try:
-        print(f"Starting transaction verification request")
-        with grpc.insecure_channel("transaction_verification:50052") as channel:
-            stub = transaction_verification_grpc.TransactionVerificationServiceStub(
-                channel
-            )
-            response = stub.VerifyTransaction(
-                transaction_verification.TransactionRequest(id="123", cvv=int(cvv))
-            )
-            print(f"transaction verification result recieved")
-            result.put(("is_verified", response.is_verified))
-
-    except Exception as e:
-        print(f"ERROR in transaction verification: {str(e)}")
-        result.put(("is_verified", False))
-
-
-def call_suggestions(items, result):
-    try:
-        print(f"Starting book suggestions request")
-
-        with grpc.insecure_channel("suggestions:50053") as channel:
-            stub = suggestions_grpc.SuggestionServiceStub(channel)
-
-            # If the proto expects `query`, pass it as `query`
-            query = ";".join([item["name"] for item in items])
-            response = stub.GetSuggestions(suggestions.SuggestionsRequest(query=query))
-            print(f"Book suggestions received")
-
-            # Convert the response to dictionary
-            response_dict = MessageToDict(response)
-
-            # Ensure the correct field name (suggestedBooks in the response)
-            suggestions_list = response_dict.get("suggestedBooks", [])
-
-            # Put the suggestions in the result queue
-            result.put(("suggestions", suggestions_list))
-
-    except Exception as e:
-        print(f"ERROR in suggestions service: {str(e)}")
-        result.put(("suggestions", []))
-
-
 @app.route("/checkout", methods=["POST"])
 def checkout():
+    service = OrchestratorService()
+
     try:
         print(f"Received new checkout request")
 
-        request_data = json.loads(request.data)
-        result_queue = queue.Queue()
+        request_data = request.get_json()
 
-        print(f"Processing order for user")
+        order_data = json.dumps(request_data)
+        order_id = str(uuid.uuid4())
+
+        results = queue.Queue()
+
+        print(f"Caching order data")
         print(f"Creating worker threads")
         threads = [
             threading.Thread(
-                target=call_fraud_detection,
-                args=(request_data["creditCard"]["number"], result_queue),
+                target=service.fraud_init,
+                args=(order_id, order_data),
             ),
             threading.Thread(
-                target=call_transaction_verification,
-                args=(request_data["creditCard"]["cvv"], result_queue),
+                target=service.transaction_init,
+                args=(order_id, order_data),
             ),
             threading.Thread(
-                target=call_suggestions,
-                args=(request_data["items"], result_queue),
+                target=service.suggestion_init,
+                args=(order_id, order_data),
             ),
         ]
 
@@ -137,8 +57,8 @@ def checkout():
         print(f"Threads processing completed")
 
         results = {}
-        while not result_queue.empty():
-            key, value = result_queue.get()
+        while not results.empty():
+            key, value = results.get()
             results[key] = value
         print(f"Final results: {results}")
 

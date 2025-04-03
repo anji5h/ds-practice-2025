@@ -1,3 +1,4 @@
+import json
 import sys
 import os
 import grpc
@@ -14,6 +15,7 @@ sys.path.insert(0, transaction_grpc_path)
 
 import transaction_verification_pb2 as transaction
 import transaction_verification_pb2_grpc as transaction_grpc
+from google.protobuf import empty_pb2
 
 
 # Create a class to define the server functions, derived from
@@ -25,31 +27,69 @@ class TransactionVerificationService(
         self.svc_idx = svc_idx
         self.total_svcs = total_svcs
         self.orders = {}
-    
-    def InitOrder(self, order_id, data):
-        # Initialize an order with an empty vector clock for tracking
-        self.orders[order_id] = {"data": data, "vc": [0] * self.total_svcs}
+
+    def InitOrder(self, request, context):
+        data = json.loads(request.order_data)
+        self.orders[request.order_id] = {"data": data, "vc": [0] * self.total_svcs}
+        return empty_pb2.Empty()
 
     def merge_and_increment(self, local_vc, incoming_vc):
-        # Merge the incoming vector clock with the local one and increment the current service's slot
         for i in range(self.total_svcs):
-            local_vc[i] = max(local_vc[i], incoming_vc[i])  # Merge the clocks
-        local_vc[self.svc_idx] += 1  # Increment this service's vector clock slot
+            local_vc[i] = max(local_vc[i], incoming_vc[i])
+        local_vc[self.svc_idx] += 1
 
-    # Create an RPC function to verify transaction
-    def VerifyTransaction(self, request, context):
-        # Transaction verification logic
-        # Example: approve transactions below a threshold, flag those above
-        is_verified = False if request.cvv > 999 else True
-        # Create a TransactionVerificationResponse object
+    def VerifyUser(self, request, context):
+        print(f"Received order_id {request.order_id}")
+        order_data = self.orders.get(request.order_id)
+        self.merge_and_increment(order_data["vc"], request.vc)
+
         response = transaction.TransactionVerificationResponse()
-        # Set the status and message in the response object
-        response.is_verified = is_verified
-        # Print the status message
-        print(f"Sending transaction verification result: {response.is_verified}")
-        # Return the response object
+
+        if not order_data:
+            response.is_verified = False
+            response.vc = order_data["vc"]
+            return response
+
+        response.is_verified = (
+            order_data["user"]["name"] and order_data["user"]["contact"]
+        )
+        response.vc = order_data["vc"]
+
         return response
 
+    def VerifyAddress(self, request, context):
+        print(f"Received order_id {request.order_id}")
+        order_data = self.orders.get(request.order_id)
+        self.merge_and_increment(order_data["vc"], request.vc)
+
+        response = transaction.TransactionVerificationResponse()
+
+        if not order_data:
+            response.is_verified = False
+            response.vc = order_data["vc"]
+            return response
+
+        response.is_verified = order_data["billingAddress"]["country"] == "USA"
+        response.vc = order_data["vc"]
+
+        return response
+
+    def VerifyCreditCard(self, request, context):
+        print(f"Received order_id {request.order_id}")
+        order_data = self.orders.get(request.order_id)
+        self.merge_and_increment(order_data["vc"], request.vc)
+
+        response = transaction.TransactionVerificationResponse()
+
+        if not order_data:
+            response.is_verified = False
+            response.vc = order_data["vc"]
+            return response
+
+        response.is_verified = len(order_data["creditCard"]["number"]) > 10
+        response.vc = order_data["vc"]
+
+        return response
 
 def serve():
     # Create a gRPC server
