@@ -101,3 +101,55 @@ services:
       - ./utils:/app/utils
       # Mount the fraud_detection/src directory in the current directory to the /app/transaction_verification/src directory in the container
       - ./transaction_verification/src:/app/transaction_verification/src
+
+  order_queue:
+    build:
+      # Use the current directory as the build context
+      # This allows us to access the files in the current directory inside the Dockerfile
+      context: ./
+      # Use the Dockerfile in the transaction_verification directorys
+      dockerfile: ./order_queue/Dockerfile
+    ports:
+      # Expose port 50052 on the host, and map port 50051 of the container to port 50052 on the host
+      - 50054:50054
+    environment:
+      # Pass the environment variables to the container
+      # The PYTHONUNBUFFERED environment variable ensures that the output from the application is logged to the console
+      - PYTHONUNBUFFERED=TRUE
+      # The PYTHONFILE environment variable specifies the absolute entry point of the application
+      # Check app.py in the transaction_verification directory to see how this is used
+      - PYTHONFILE=/app/order_queue/src/app.py
+    volumes:
+      # Mount the utils directory in the current directory to the /app/utils directory in the container
+      - ./utils:/app/utils
+      # Mount the fraud_detection/src directory in the current directory to the /app/transaction_verification/src directory in the container
+      - ./order_queue/src:/app/order_queue/src
+  
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+  
+  order_executor:
+    build:
+      # Use the current directory as the build context
+      # This allows us to access the files in the current directory inside the Dockerfile
+      context: ./
+      # Use the Dockerfile in the transaction_verification directorys
+      dockerfile: ./order_executor/Dockerfile
+    environment:
+      # Pass the environment variables to the container
+      # The PYTHONUNBUFFERED environment variable ensures that the output from the application is logged to the console
+      - PYTHONUNBUFFERED=TRUE
+      # The PYTHONFILE environment variable specifies the absolute entry point of the application
+      # Check app.py in the transaction_verification directory to see how this is used
+      - PYTHONFILE=/app/order_executor/src/app.py
+    volumes:
+      # Mount the utils directory in the current directory to the /app/utils directory in the container
+      - ./utils:/app/utils
+      # Mount the fraud_detection/src directory in the current directory to the /app/transaction_verification/src directory in the container
+      - ./order_executor/src:/app/order_executor/src
+    deploy:
+      replicas: 3
+    depends_on:
+      - redis

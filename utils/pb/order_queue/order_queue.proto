@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package order_queue;
+
+service OrderQueueService {
+  rpc EnqueueOrder (OrderRequest) returns (EnqueueResponse);
+  rpc DequeueOrder (google.protobuf.Empty) returns (OrderResponse);
+}
+
+message OrderRequest {
+    string order_id = 1;
+    string order_data = 2;
+}
+
+message EnqueueResponse {
+    string result = 1;
+}
+
+message OrderResponse {
+    optional string order_id = 1;
+    optional string order_data = 2;
+    bool available = 3;
+}

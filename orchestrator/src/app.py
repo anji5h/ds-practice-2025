@@ -68,6 +68,8 @@ def checkout():
         print("Getting Book Suggestion Complete\n")
         print(f"Current vector clock: {service.vc}\n")
 
+        service.enqueue_order(order_id, order_data)
+
         print(f"Sending checkout response to user\n")
 
         return {

@@ -18,7 +18,7 @@ from google.protobuf import empty_pb2
 
 
 # Create a class to define the server functions, derived from
-# fraud_detection_pb2_grpc.HelloServiceServicer
+# fraud_detection_pb2_grpc.FraudServiceServicer
 class FraudService(fraud_detection_grpc.FraudServiceServicer):
     def __init__(self, svc_idx=1, total_svcs=3):
         self.svc_idx = svc_idx
@@ -109,7 +109,7 @@ class FraudService(fraud_detection_grpc.FraudServiceServicer):
 def serve():
     # Create a gRPC server
     server = grpc.server(futures.ThreadPoolExecutor())
-    # Add HelloService
+    # Add FraudService
     fraud_detection_grpc.add_FraudServiceServicer_to_server(FraudService(), server)
     # Listen on port 50051
     port = "50051"

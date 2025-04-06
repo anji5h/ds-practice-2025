@@ -15,10 +15,14 @@ transaction_verification_grpc_path = os.path.abspath(
 suggestions_grpc_path = os.path.abspath(
     os.path.join(FILE, "../../../utils/pb/suggestions")
 )
+order_queue_grpc_path = os.path.abspath(
+    os.path.join(FILE, "../../../utils/pb/order_queue")
+)
 
 sys.path.insert(0, fraud_detection_grpc_path)
 sys.path.insert(1, transaction_verification_grpc_path)
 sys.path.insert(2, suggestions_grpc_path)
+sys.path.insert(3, order_queue_grpc_path)
 
 import fraud_detection_pb2 as fraud_detection
 import fraud_detection_pb2_grpc as fraud_detection_grpc
@@ -26,6 +30,8 @@ import transaction_verification_pb2 as transaction_verification
 import transaction_verification_pb2_grpc as transaction_verification_grpc
 import suggestions_pb2 as suggestions
 import suggestions_pb2_grpc as suggestions_grpc
+import order_queue_pb2 as order_queue
+import order_queue_pb2_grpc as order_queue_grpc
 
 import grpc
 from google.protobuf.json_format import MessageToDict
@@ -36,6 +42,7 @@ class OrchestratorService:
         self.fraud_detection_url = "fraud_detection:50051"
         self.transaction_verification_url = "transaction_verification:50052"
         self.suggestions_url = "suggestions:50053"
+        self.order_queue_url = "order_queue:50054"
         self.total_svcs = total_svcs
         self.vc = [0] * total_svcs
 
@@ -221,14 +228,27 @@ class OrchestratorService:
             return []
 
     def clean_suggestion_order(self, order_id):
-            print(f"Starting suggestion cleanup request\n")
-            with grpc.insecure_channel(self.suggestions_url) as channel:
-                stub = suggestions_grpc.SuggestionServiceStub(channel)
-                response = stub.CleanOrder(
-                    suggestions.SuggestionRequest(order_id=order_id, vc=self.vc)
-                )
-                print(f"suggestions: order cleanup complete\n")
+        print(f"Starting suggestion cleanup request\n")
+        with grpc.insecure_channel(self.suggestions_url) as channel:
+            stub = suggestions_grpc.SuggestionServiceStub(channel)
+            response = stub.CleanOrder(
+                suggestions.SuggestionRequest(order_id=order_id, vc=self.vc)
+            )
+            print(f"suggestions: order cleanup complete\n")
 
-                response_dict = MessageToDict(response)
-                if response_dict["result"] == "fail":
-                    print(f"SUGGESTIONS: CLEANUP FAILED, {order_id}")
+            response_dict = MessageToDict(response)
+            if response_dict["result"] == "fail":
+                print(f"SUGGESTIONS: CLEANUP FAILED, {order_id}")
+
+    def enqueue_order(self, order_id, order_data):
+        print(f"Starting order enqueue request\n")
+        with grpc.insecure_channel(self.order_queue_url) as channel:
+            stub = order_queue_grpc.OrderQueueServiceStub(channel)
+            response = stub.EnqueueOrder(
+                order_queue.OrderRequest(order_id=order_id, order_data=order_data)
+            )
+            print(f"order_queue: enqueue order complete\n")
+
+            response_dict = MessageToDict(response)
+            if response_dict["result"] == "fail":
+                print(f"ENQUEUE ORDER FAILED, {order_id}")
