@@ -3,6 +3,15 @@ import sys
 import os
 import grpc
 from concurrent import futures
+import threading
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+)
+logger = logging.getLogger(__name__)
 
 # This set of lines are needed to import the gRPC stubs.
 # The path of the stubs is relative to the current file, or absolute inside the container.
@@ -24,6 +33,7 @@ class FraudService(fraud_detection_grpc.FraudServiceServicer):
         self.svc_idx = svc_idx
         self.total_svcs = total_svcs
         self.orders = {}
+        self.lock = threading.Lock()
 
     def InitOrder(self, request, context):
         data = json.loads(request.order_data)
@@ -31,9 +41,10 @@ class FraudService(fraud_detection_grpc.FraudServiceServicer):
         return empty_pb2.Empty()
 
     def merge_and_increment(self, local_vc, incoming_vc):
-        for i in range(self.total_svcs):
-            local_vc[i] = max(local_vc[i], incoming_vc[i])
-        local_vc[self.svc_idx] += 1
+        with self.lock:
+            for i in range(self.total_svcs):
+                local_vc[i] = max(local_vc[i], incoming_vc[i])
+            local_vc[self.svc_idx] += 1
 
     def clean_order(self, order_id, local_vc, incoming_vc):
         if local_vc[self.svc_idx] <= incoming_vc[self.svc_idx]:
@@ -43,7 +54,7 @@ class FraudService(fraud_detection_grpc.FraudServiceServicer):
             return False
 
     def CheckCreditCard(self, request, context):
-        print(f"checking credit data of order {request.order_id}")
+        logger.info(f"Checking credit data of order {request.order_id}")
         order_data = self.orders.get(request.order_id, None)
 
         response = fraud_detection.FraudResponse()
@@ -65,7 +76,7 @@ class FraudService(fraud_detection_grpc.FraudServiceServicer):
         return response
 
     def CheckUser(self, request, context):
-        print(f"checking user data of order {request.order_id}")
+        logger.info(f"Checking user data of order {request.order_id}")
         order_data = self.orders.get(request.order_id, None)
 
         response = fraud_detection.FraudResponse()
@@ -87,7 +98,7 @@ class FraudService(fraud_detection_grpc.FraudServiceServicer):
         return response
 
     def CleanOrder(self, request, context):
-        print(f"cleaning order {request.order_id}")
+        logger.info(f"Cleaning order {request.order_id}")
         order_data = self.orders.get(request.order_id, None)
 
         response = fraud_detection.FraudResponse()
@@ -116,7 +127,7 @@ def serve():
     server.add_insecure_port("[::]:" + port)
     # Start the server
     server.start()
-    print("Server started. Listening on port 50051.")
+    logger.info("Server started. Listening on port 50051.")
     # Keep thread alive
     server.wait_for_termination()
 

@@ -3,7 +3,16 @@ import sys
 import os
 import grpc
 import requests
+import logging
 from concurrent import futures
+import threading
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+)
+logger = logging.getLogger(__name__)
 
 FILE = __file__ if "__file__" in globals() else os.getenv("PYTHONFILE", "")
 suggestion_grpc_path = os.path.abspath(
@@ -25,16 +34,19 @@ class SuggestionService(suggestion_grpc.SuggestionServiceServicer):
         self.svc_idx = svc_idx
         self.total_svcs = total_svcs
         self.orders = {}
+        self.lock = threading.Lock()  
 
     def InitOrder(self, request, context):
         data = json.loads(request.order_data)
         self.orders[request.order_id] = {"data": data, "vc": [0] * self.total_svcs}
+        logger.info(f"Initialized order {request.order_id}")
         return empty_pb2.Empty()
 
     def merge_and_increment(self, local_vc, incoming_vc):
-        for i in range(self.total_svcs):
-            local_vc[i] = max(local_vc[i], incoming_vc[i])
-        local_vc[self.svc_idx] += 1
+        with self.lock:
+            for i in range(self.total_svcs):
+                local_vc[i] = max(local_vc[i], incoming_vc[i])
+            local_vc[self.svc_idx] += 1
 
     def clean_order(self, order_id, local_vc, incoming_vc):
         if local_vc[self.svc_idx] <= incoming_vc[self.svc_idx]:
@@ -44,17 +56,18 @@ class SuggestionService(suggestion_grpc.SuggestionServiceServicer):
             return False
 
     def GetSuggestions(self, request, context):
-        print(f"Received order_id {request.order_id}")
+        logger.info(f"Processing suggestions request for order {request.order_id}")
 
         order_data = self.orders.get(request.order_id)
-        self.merge_and_increment(order_data["vc"], request.vc)
-
         response = suggestion.SuggestionsResponse()
 
         if not order_data:
+            logger.warning(f"Order {request.order_id} not found")
             response.suggestedBooks = []
-            response.vc.extend(order_data["vc"])
+            response.vc.extend(request.vc)
             return response
+
+        self.merge_and_increment(order_data["vc"], request.vc)
 
         query = ";".join([item["name"] for item in order_data["data"]["items"]])
         books = self.fetch_books(query)
@@ -62,12 +75,12 @@ class SuggestionService(suggestion_grpc.SuggestionServiceServicer):
         response.suggestedBooks.extend(books)
         response.vc.extend(order_data["vc"])
 
-        print(f"Returning {len(books)} suggestions for query '{query}'")
+        logger.info(f"Returning {len(books)} suggestions for order {request.order_id}")
         return response
 
     def fetch_books(self, query):
         try:
-            print(f"Fetching books from API for query: {query}")
+            logger.debug(f"Querying book API for: {query}")
             response = requests.get(BOOK_API_URL, params={"q": query, "limit": 5})
             response.raise_for_status()
             data = response.json()
@@ -82,29 +95,33 @@ class SuggestionService(suggestion_grpc.SuggestionServiceServicer):
                 )
                 books.append(book)
 
-            print(f"Fetched {len(books)} books for query '{query}'")
+            logger.debug(f"Found {len(books)} books for query '{query}'")
             return books
         except Exception as e:
-            print(f"Error fetching books: {e}")
+            logger.error(f"Failed to fetch books: {str(e)}")
             return []
 
     def CleanOrder(self, request, context):
-        print(f"cleaning order {request.order_id}")
+        logger.info(f"Cleaning order {request.order_id}")
         order_data = self.orders.get(request.order_id, None)
 
         response = suggestion.CleanOrderResponse()
 
         if not order_data:
+            logger.warning(f"Order {request.order_id} not found during cleanup")
             response.result = "fail"
             response.vc.extend(request.vc)
             return response
 
-        response.result = (
-            "fail"
-            if not self.clean_order(request.order_id, order_data["vc"], request.vc)
-            else "pass"
-        )
+        cleanup_result = self.clean_order(request.order_id, order_data["vc"], request.vc)
+        response.result = "fail" if not cleanup_result else "pass"
         response.vc.extend(order_data["vc"])
+        
+        if cleanup_result:
+            logger.info(f"Successfully cleaned order {request.order_id}")
+        else:
+            logger.warning(f"Failed to clean order {request.order_id}")
+
         return response
 
 
@@ -116,7 +133,7 @@ def serve():
     server.add_insecure_port(f"[::]:{port}")
     server.start()
 
-    print(f"Server started. Listening on port {port}.")
+    logger.info(f"Server started. Listening on port {port}.")
     server.wait_for_termination()
 
 
