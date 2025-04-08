@@ -5,9 +5,17 @@ import time
 import redis
 import grpc
 import random
+import logging
 from google.protobuf import empty_pb2
 from typing import Optional
 from dataclasses import dataclass
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+)
+logger = logging.getLogger(__name__)
 
 # gRPC stub import setup
 FILE = __file__ if "__file__" in globals() else os.getenv("PYTHONFILE", "")
@@ -47,11 +55,11 @@ class ExecutorService:
 
     def _register_executor(self) -> None:
         self.redis.sadd(self.executor_key, self.executor_id)
-        print(f"Executor {self.executor_id}: Registered")
+        logger.info(f"Executor {self.executor_id}: Registered")
 
     def _unregister_executor(self) -> None:
         self.redis.srem(self.executor_key, self.executor_id)
-        print(f"Executor {self.executor_id}: Unregistered")
+        logger.info(f"Executor {self.executor_id}: Unregistered")
 
     def get_leader(self) -> Optional[str]:
         return self.redis.get(self.leader_key)
@@ -79,25 +87,25 @@ class ExecutorService:
             response = self.stub.DequeueOrder(empty_pb2.Empty())
             if response.available:
                 order_id = response.order_id
-                print(f"Executor {self.executor_id} (leader): Processing order: {order_id}")
+                logger.info(f"Executor {self.executor_id} (leader): Processing order: {order_id}")
                 time.sleep(self.config.POLL_INTERVAL)
-                print(f"Executor {self.executor_id} (leader): Order: {order_id} processed")
+                logger.info(f"Executor {self.executor_id} (leader): Order: {order_id} processed")
             else:
-                print(f"Executor {self.executor_id} (leader): No orders to process")
+                logger.info(f"Executor {self.executor_id} (leader): No orders to process")
         except grpc.RpcError as e:
-            print(f"Executor {self.executor_id}: gRPC Error: {e.details()}")
+            logger.error(f"Executor {self.executor_id}: gRPC Error: {e.details()}")
 
     def elect_leader(self) -> str:
         executors = sorted(self.redis.smembers(self.executor_key), reverse=True)
         if not executors:
-            print("No executors available, retrying...")
+            logger.warning("No executors available, retrying...")
             time.sleep(10)
             return self.elect_leader()
         return executors[0]
 
     def _should_crash(self) -> bool:
         if random.random() < self.config.CRASH_PROBABILITY:
-            print(f"Executor {self.executor_id}: Crashed")
+            logger.error(f"Executor {self.executor_id}: Crashed")
             self._unregister_executor()
             self.running = False
             return True
@@ -107,7 +115,7 @@ class ExecutorService:
         leader_id = self.elect_leader()
         self._set_leader(leader_id)
         self._update_heartbeat()
-        print(f"Leader elected: {leader_id}")
+        logger.info(f"Leader elected: {leader_id}")
 
     def run(self) -> None:
         while True:
@@ -126,6 +134,7 @@ class ExecutorService:
 
             # Recovery after crash
             if not self.running:
+                logger.info("Executor recovering from crash...")
                 time.sleep(30)
                 self._register_executor()
                 self.running = True
@@ -134,12 +143,12 @@ class ExecutorService:
         heartbeat = self._get_heartbeat()
         if not heartbeat or (time.time() - heartbeat) >= self.config.HEARTBEAT_TIMEOUT:
             if self._try_acquire_election_lock():
-                print(f"Leader {leader_id} unresponsive. Initiating election")
+                logger.warning(f"Leader {leader_id} unresponsive. Initiating election")
                 self.start_election()
             else:
-                print("Election already in progress")
+                logger.info("Election already in progress")
         else:
-            print(f"Executor {self.executor_id}: Current leader: {leader_id}")
+            logger.info(f"Executor {self.executor_id}: Current leader: {leader_id}")
 
 def launch_executor() -> None:
     with grpc.insecure_channel(Config.GRPC_CHANNEL) as channel:

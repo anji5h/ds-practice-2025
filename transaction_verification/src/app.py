@@ -2,7 +2,14 @@ import json
 import sys
 import os
 import grpc
+import logging
 from concurrent import futures
+import threading
+
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # This set of lines are needed to import the gRPC stubs.
 # The path of the stubs is relative to the current file, or absolute inside the container.
@@ -18,8 +25,6 @@ import transaction_verification_pb2_grpc as transaction_grpc
 from google.protobuf import empty_pb2
 
 
-# Create a class to define the server functions, derived from
-# transaction_pb2_grpc.TransactionVerificationServiceServicer
 class TransactionVerificationService(
     transaction_grpc.TransactionVerificationServiceServicer
 ):
@@ -27,6 +32,7 @@ class TransactionVerificationService(
         self.svc_idx = svc_idx
         self.total_svcs = total_svcs
         self.orders = {}
+        self.lock = threading.Lock() 
 
     def InitOrder(self, request, context):
         data = json.loads(request.order_data)
@@ -34,9 +40,10 @@ class TransactionVerificationService(
         return empty_pb2.Empty()
 
     def merge_and_increment(self, local_vc, incoming_vc):
-        for i in range(self.total_svcs):
-            local_vc[i] = max(local_vc[i], incoming_vc[i])
-        local_vc[self.svc_idx] += 1
+        with self.lock:
+            for i in range(self.total_svcs):
+                local_vc[i] = max(local_vc[i], incoming_vc[i])
+            local_vc[self.svc_idx] += 1
 
     def clean_order(self, order_id, local_vc, incoming_vc):
         if local_vc[self.svc_idx] <= incoming_vc[self.svc_idx]:
@@ -46,7 +53,7 @@ class TransactionVerificationService(
             return False
 
     def VerifyUser(self, request, context):
-        print(f"Verify user: Received order_id {request.order_id}\n")
+        logger.info(f"Verify user: Received order_id {request.order_id}")
         order_data = self.orders.get(request.order_id)
         response = transaction.TransactionResponse()
 
@@ -65,11 +72,11 @@ class TransactionVerificationService(
         )
         response.vc.extend(order_data["vc"])
 
-        print(f"Verify user: Response {response}\n")
+        logger.info(f"Verify user: Response {response}")
         return response
 
     def VerifyAddress(self, request, context):
-        print(f"Verify Address: Received order_id {request.order_id}\n")
+        logger.info(f"Verify Address: Received order_id {request.order_id}")
         order_data = self.orders.get(request.order_id)
 
         response = transaction.TransactionResponse()
@@ -88,12 +95,11 @@ class TransactionVerificationService(
         )
         response.vc.extend(order_data["vc"])
 
-        print(f"Verify Address: Response {response}\n")
-
+        logger.info(f"Verify Address: Response {response}")
         return response
 
     def VerifyCreditCard(self, request, context):
-        print(f"Verify Credit Card: Received order_id {request.order_id}\n")
+        logger.info(f"Verify Credit Card: Received order_id {request.order_id}")
         order_data = self.orders.get(request.order_id)
 
         response = transaction.TransactionResponse()
@@ -110,11 +116,11 @@ class TransactionVerificationService(
         )
         response.vc.extend(order_data["vc"])
 
-        print(f"Verify Credit Card: Response {response}\n")
+        logger.info(f"Verify Credit Card: Response {response}")
         return response
 
     def CleanOrder(self, request, context):
-        print(f"cleaning order {request.order_id}")
+        logger.info(f"Cleaning order {request.order_id}")
         order_data = self.orders.get(request.order_id, None)
 
         response = transaction.TransactionResponse()
@@ -134,19 +140,15 @@ class TransactionVerificationService(
 
 
 def serve():
-    # Create a gRPC server
     server = grpc.server(futures.ThreadPoolExecutor())
-    # Add TransactionVerificationService to the server
     transaction_grpc.add_TransactionVerificationServiceServicer_to_server(
         TransactionVerificationService(), server
     )
 
     port = "50052"
     server.add_insecure_port("[::]:" + port)
-    # Start the server
     server.start()
-    print("Server started. Listening on port 50051.")
-    # Keep the server running
+    logger.info("Server started. Listening on port 50051.")
     server.wait_for_termination()
 
 
