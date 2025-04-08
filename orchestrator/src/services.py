@@ -3,20 +3,18 @@ import os
 import logging
 from threading import Event
 import threading
+import grpc
+from google.protobuf.json_format import MessageToDict
 
-
-# Configure logging 
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-# This set of lines are needed to import the gRPC stubs.
-# The path of the stubs is relative to the current file, or absolute inside the container.
-# Change these lines only if strictly needed.
+# gRPC stub imports (unchanged)
 FILE = __file__ if "__file__" in globals() else os.getenv("PYTHONFILE", "")
-
 fraud_detection_grpc_path = os.path.abspath(
     os.path.join(FILE, "../../../utils/pb/fraud_detection")
 )
@@ -44,9 +42,6 @@ import suggestions_pb2_grpc as suggestions_grpc
 import order_queue_pb2 as order_queue
 import order_queue_pb2_grpc as order_queue_grpc
 
-import grpc
-from google.protobuf.json_format import MessageToDict
-
 
 class OrchestratorService:
     def __init__(self, total_svcs=3):
@@ -54,24 +49,20 @@ class OrchestratorService:
         self.transaction_verification_url = "transaction_verification:50052"
         self.suggestions_url = "suggestions:50053"
         self.order_queue_url = "order_queue:50054"
-
-        # local vector clock
         self.total_svcs = total_svcs
         self.vc = [0] * total_svcs
-        # thread event
-        self.verify_user_event_status=Event()
-        self.verify_credit_card_status=Event()
-        # thread locking
-        self.lock=threading.Lock()
-       
+        self.verify_user_event_status = Event()
+        self.verify_credit_card_status = Event()
+        self.lock = threading.Lock()
+
     def merge_and_increment(self, local_vc, incoming_vc):
         with self.lock:
             for i in range(self.total_svcs):
                 local_vc[i] = max(local_vc[i], incoming_vc[i])
 
     def fraud_init(self, order_id, order_data):
+        logger.info(f"Fraud - Init order {order_id}")
         try:
-            logger.info("Starting fraud init request")
             with grpc.insecure_channel(self.fraud_detection_url) as channel:
                 stub = fraud_detection_grpc.FraudServiceStub(channel)
                 stub.InitOrder(
@@ -79,62 +70,68 @@ class OrchestratorService:
                         order_id=order_id, order_data=order_data
                     )
                 )
-                logger.info(f"fraud_detection: order {order_id} cached")
+                logger.info(f"Fraud - Order {order_id} cached")
         except Exception as e:
-            logger.error(f"{self.fraud_init.__name__}:{str(e)}")
-            raise Exception(f"FRAUD_DETECTION: CACHING FAILED")
+            logger.error(f"Fraud - Cache failed {order_id}: {e}")
+            raise Exception("FRAUD_DETECTION: CACHING FAILED")
 
     def check_user(self, order_id):
         self.verify_user_event_status.wait()
-        logger.info(f"Starting check user request, order_id: {order_id}")
-        with grpc.insecure_channel(self.fraud_detection_url) as channel:
-            stub = fraud_detection_grpc.FraudServiceStub(channel)
-            response = stub.CheckUser(
-                fraud_detection.FraudRequest(order_id=order_id, vc=self.vc)
-            )
-            logger.info("fraud_detection: check_user complete")
-            response_dict = MessageToDict(response)
-            logger.info(f"fraud_detection: current vector clock: {response_dict['vc']}")
-
-            if response_dict["result"] == "fail":
-                raise Exception(f"FRAUD_DETECTION: CHECK USER FAILED")
-            
-            self.merge_and_increment(self.vc, response_dict["vc"])
-            
+        logger.info(f"Fraud - Check user {order_id}")
+        try:
+            with grpc.insecure_channel(self.fraud_detection_url) as channel:
+                stub = fraud_detection_grpc.FraudServiceStub(channel)
+                response = stub.CheckUser(
+                    fraud_detection.FraudRequest(order_id=order_id, vc=self.vc)
+                )
+                response_dict = MessageToDict(response)
+                logger.info(
+                    f"Fraud - Check_User {order_id} OK, vc={response_dict['vc']}"
+                )
+                if response_dict["result"] == "fail":
+                    raise Exception("FRAUD_DETECTION: CHECK USER FAILED")
+                self.merge_and_increment(self.vc, response_dict["vc"])
+        except Exception as e:
+            raise
 
     def check_credit_card(self, order_id):
         self.verify_credit_card_status.wait()
-        logger.info(f"Starting check credit card request, order_id: {order_id}")
-        with grpc.insecure_channel(self.fraud_detection_url) as channel:
-            stub = fraud_detection_grpc.FraudServiceStub(channel)
-            response = stub.CheckCreditCard(
-                fraud_detection.FraudRequest(order_id=order_id, vc=self.vc)
-            )
-            logger.info("fraud_detection: check_credit_card complete")
-            response_dict = MessageToDict(response)
-            logger.info(f"fraud_detection: current vector clock:{response_dict['vc']}")
-
-            if response_dict["result"] == "fail":
-                raise Exception(f"FRAUD_DETECTION: CHECK USER FAILED")
-
-            self.merge_and_increment(self.vc, response_dict["vc"])
-            
+        logger.info(f"Fraud - Check card {order_id}")
+        try:
+            with grpc.insecure_channel(self.fraud_detection_url) as channel:
+                stub = fraud_detection_grpc.FraudServiceStub(channel)
+                response = stub.CheckCreditCard(
+                    fraud_detection.FraudRequest(order_id=order_id, vc=self.vc)
+                )
+                response_dict = MessageToDict(response)
+                logger.info(
+                    f"Fraud - Check_Card {order_id} OK, vc={response_dict['vc']}"
+                )
+                if response_dict["result"] == "fail":
+                    raise Exception("FRAUD_DETECTION: CHECK CREDIT CARD FAILED")
+                self.merge_and_increment(self.vc, response_dict["vc"])
+        except Exception as e:
+            raise
 
     def clean_fraud_order(self, order_id):
-        logger.info(f"Starting fraud cleanup request, order_id: {order_id}")
-        with grpc.insecure_channel(self.fraud_detection_url) as channel:
-            stub = fraud_detection_grpc.FraudServiceStub(channel)
-            response = stub.CleanOrder(
-                fraud_detection.FraudRequest(order_id=order_id, vc=self.vc)
-            )
-            logger.info("fraud_detection: order cleanup complete")
-            response_dict = MessageToDict(response)
-            if response_dict["result"] == "fail":
-                logger.warning(f"FRAUD_DETECTION: CLEANUP FAILED, {order_id}")
+        logger.info(f"Fraud - Clean order {order_id}")
+        try:
+            with grpc.insecure_channel(self.fraud_detection_url) as channel:
+                stub = fraud_detection_grpc.FraudServiceStub(channel)
+                response = stub.CleanOrder(
+                    fraud_detection.FraudRequest(order_id=order_id, vc=self.vc)
+                )
+                response_dict = MessageToDict(response)
+                if response_dict["result"] == "fail":
+                    logger.warning(f"Fraud - Clean failed {order_id}")
+                else:
+                    logger.info(f"Fraud - Order {order_id} cleaned")
+        except Exception as e:
+            logger.error(f"Fraud - Clean error {order_id}: {e}")
 
     def transaction_init(self, order_id, order_data):
+        logger.info(f"Tx - Init order {order_id}")
         try:
-            logger.info("Starting transaction init request")
             with grpc.insecure_channel(self.transaction_verification_url) as channel:
                 stub = transaction_verification_grpc.TransactionVerificationServiceStub(
                     channel
@@ -144,143 +141,158 @@ class OrchestratorService:
                         order_id=order_id, order_data=order_data
                     )
                 )
-                logger.info(f"transaction_verification: order {order_id} cached")
+                logger.info(f"Tx - Order {order_id} cached")
         except Exception as e:
-            logger.error(f"{self.transaction_init.__name__}{str(e)}")
-            raise Exception(f"TRANSACTION VERIFICATION: CACHING FAILED")
+            logger.error(f"Tx - Cache failed {order_id}: {e}")
+            raise Exception("TRANSACTION VERIFICATION: CACHING FAILED")
 
     def verify_user(self, order_id):
-        logger.info("Starting transaction verify user request")
-        with grpc.insecure_channel(self.transaction_verification_url) as channel:
-            stub = transaction_verification_grpc.TransactionVerificationServiceStub(
-                channel
-            )
-            response = stub.VerifyUser(
-                transaction_verification.TransactionRequest(
-                    order_id=order_id, vc=self.vc
+        logger.info(f"Tx - Verify user {order_id}")
+        try:
+            with grpc.insecure_channel(self.transaction_verification_url) as channel:
+                stub = transaction_verification_grpc.TransactionVerificationServiceStub(
+                    channel
                 )
-            )
-            logger.info("transaction_verification: verify_user complete")
-            response_dict = MessageToDict(response)
-            logger.info(f"transaction_verification: current vector clock:{response_dict['vc']}")
-
-            if response_dict["result"] == "fail":
-                raise Exception(f"TRANSACTION VERIFICATION: USER VERIFY FAILED")
-
-            self.merge_and_increment(self.vc, response_dict["vc"])
+                response = stub.VerifyUser(
+                    transaction_verification.TransactionRequest(
+                        order_id=order_id, vc=self.vc
+                    )
+                )
+                response_dict = MessageToDict(response)
+                logger.info(f"Tx - Verify_User {order_id} OK, vc={response_dict['vc']}")
+                if response_dict["result"] == "fail":
+                    raise Exception("TRANSACTION VERIFICATION: USER VERIFY FAILED")
+                self.merge_and_increment(self.vc, response_dict["vc"])
+        except Exception as e:
+            raise
+        finally:
             self.verify_user_event_status.set()
 
     def verify_credit_card(self, order_id):
-        logger.info("Starting transaction verify credit card request")
-        with grpc.insecure_channel(self.transaction_verification_url) as channel:
-            stub = transaction_verification_grpc.TransactionVerificationServiceStub(
-                channel
-            )
-            response = stub.VerifyCreditCard(
-                transaction_verification.TransactionRequest(
-                    order_id=order_id, vc=self.vc
+        logger.info(f"Tx - Verify card {order_id}")
+        try:
+            with grpc.insecure_channel(self.transaction_verification_url) as channel:
+                stub = transaction_verification_grpc.TransactionVerificationServiceStub(
+                    channel
                 )
-            )
-            logger.info("transaction_verification: verify_credit_card complete")
-            response_dict = MessageToDict(response)
-            logger.info(f"transaction_verification: current vector clock:{response_dict['vc']}")
-
-            if response_dict["result"] == "fail":
-                raise Exception(f"TRANSACTION VERIFICATION: CREDIT CARD VERIFY FAILED")
-
-            self.merge_and_increment(self.vc, response_dict["vc"])
+                response = stub.VerifyCreditCard(
+                    transaction_verification.TransactionRequest(
+                        order_id=order_id, vc=self.vc
+                    )
+                )
+                response_dict = MessageToDict(response)
+                logger.info(f"Tx - Verify_Card {order_id} OK, vc={response_dict['vc']}")
+                if response_dict["result"] == "fail":
+                    raise Exception(
+                        "TRANSACTION VERIFICATION: CREDIT CARD VERIFY FAILED"
+                    )
+                self.merge_and_increment(self.vc, response_dict["vc"])
+        except Exception as e:
+            raise
+        finally:
             self.verify_credit_card_status.set()
 
     def verify_address(self, order_id):
-        logger.info("Starting transaction verify address request")
-        with grpc.insecure_channel(self.transaction_verification_url) as channel:
-            stub = transaction_verification_grpc.TransactionVerificationServiceStub(
-                channel
-            )
-            response = stub.VerifyAddress(
-                transaction_verification.TransactionRequest(
-                    order_id=order_id, vc=self.vc
+        logger.info(f"Tx - Verify address {order_id}")
+        try:
+            with grpc.insecure_channel(self.transaction_verification_url) as channel:
+                stub = transaction_verification_grpc.TransactionVerificationServiceStub(
+                    channel
                 )
-            )
-            logger.info("transaction_verification: verify_address complete")
-            response_dict = MessageToDict(response)
-            logger.info(f"transaction_verification: current vector clock:{response_dict['vc']}")
-            if response_dict["result"] == "fail":
-                raise Exception(f"TRANSACTION VERIFICATION: ADDRESS VERIFY FAILED")
-
-            self.merge_and_increment(self.vc, response_dict["vc"])
+                response = stub.VerifyAddress(
+                    transaction_verification.TransactionRequest(
+                        order_id=order_id, vc=self.vc
+                    )
+                )
+                response_dict = MessageToDict(response)
+                logger.info(
+                    f"Tx - Verify_Address {order_id} OK, vc={response_dict['vc']}"
+                )
+                if response_dict["result"] == "fail":
+                    raise Exception("TRANSACTION VERIFICATION: ADDRESS VERIFY FAILED")
+                self.merge_and_increment(self.vc, response_dict["vc"])
+        except Exception as e:
+            raise
 
     def clean_transaction_order(self, order_id):
-        logger.info("Starting transaction cleanup request")
-        with grpc.insecure_channel(self.transaction_verification_url) as channel:
-            stub = transaction_verification_grpc.TransactionVerificationServiceStub(
-                channel
-            )
-            response = stub.CleanOrder(
-                transaction_verification.TransactionRequest(
-                    order_id=order_id, vc=self.vc
+        logger.info(f"Tx - Clean order {order_id}")
+        try:
+            with grpc.insecure_channel(self.transaction_verification_url) as channel:
+                stub = transaction_verification_grpc.TransactionVerificationServiceStub(
+                    channel
                 )
-            )
-            logger.info("transaction_verification: order cleanup complete")
-            response_dict = MessageToDict(response)
-
-            if response_dict["result"] == "fail":
-                logger.warning(f"TRANSACTION VERIFICATION: CLEANUP FAILED, {order_id}")
+                response = stub.CleanOrder(
+                    transaction_verification.TransactionRequest(
+                        order_id=order_id, vc=self.vc
+                    )
+                )
+                response_dict = MessageToDict(response)
+                if response_dict["result"] == "fail":
+                    logger.warning(f"Tx - Clean failed {order_id}")
+                else:
+                    logger.info(f"Tx - Order {order_id} cleaned")
+        except Exception as e:
+            logger.error(f"Tx - Clean error {order_id}: {e}")
 
     def suggestion_init(self, order_id, order_data):
+        logger.info(f"Suggestions - Init order {order_id}")
         try:
-            logger.info("Starting book init request")
             with grpc.insecure_channel(self.suggestions_url) as channel:
                 stub = suggestions_grpc.SuggestionServiceStub(channel)
                 stub.InitOrder(
                     suggestions.OrderRequest(order_id=order_id, order_data=order_data)
                 )
-                logger.info(f"suggestions: order {order_id} cached")
+                logger.info(f"Suggesstions - Order {order_id} cached")
         except Exception as e:
-            logger.error(f"{self.suggestion_init.__name__}{str(e)}")
-            raise Exception(f"SUGGESTIONS: CACHING FAILED")
+            logger.error(f"Suggestions - Cache failed {order_id}: {e}")
+            raise Exception("SUGGESTIONS: CACHING FAILED")
 
     def get_suggestions(self, order_id):
+        logger.info(f"Suggestions - Get suggestions {order_id}")
         try:
-            logger.info("Starting book suggestions request")
             with grpc.insecure_channel(self.suggestions_url) as channel:
                 stub = suggestions_grpc.SuggestionServiceStub(channel)
                 response = stub.GetSuggestions(
                     suggestions.SuggestionRequest(order_id=order_id, vc=self.vc)
                 )
-                logger.info("suggestions: get_suggestions complete")
-                
                 response_dict = MessageToDict(response)
-                logger.info(f"transaction_verification: current vector clock:{response_dict['vc']}")
+                logger.info(
+                    f"Suggestions - Get_Suggestions {order_id} OK, vc={response_dict['vc']}"
+                )
                 self.merge_and_increment(self.vc, response_dict["vc"])
-
                 return response_dict.get("suggestedBooks", [])
         except Exception as e:
-            logger.error(f"ERROR in suggestions service: {str(e)}")
+            logger.error(f"Suggestions - Fetch failed {order_id}: {e}")
             return []
 
     def clean_suggestion_order(self, order_id):
-        logger.info("Starting suggestion cleanup request")
-        with grpc.insecure_channel(self.suggestions_url) as channel:
-            stub = suggestions_grpc.SuggestionServiceStub(channel)
-            response = stub.CleanOrder(
-                suggestions.SuggestionRequest(order_id=order_id, vc=self.vc)
-            )
-            logger.info("suggestions: order cleanup complete")
-
-            response_dict = MessageToDict(response)
-            if response_dict["result"] == "fail":
-                logger.warning(f"SUGGESTIONS: CLEANUP FAILED, {order_id}")
+        logger.info(f"Suggestions - Clean order {order_id}")
+        try:
+            with grpc.insecure_channel(self.suggestions_url) as channel:
+                stub = suggestions_grpc.SuggestionServiceStub(channel)
+                response = stub.CleanOrder(
+                    suggestions.SuggestionRequest(order_id=order_id, vc=self.vc)
+                )
+                response_dict = MessageToDict(response)
+                if response_dict["result"] == "fail":
+                    logger.warning(f"Suggestions - Clean failed {order_id}")
+                else:
+                    logger.info(f"Suggesstions - Order {order_id} cleaned")
+        except Exception as e:
+            logger.error(f"Suggestions - Clean error {order_id}: {e}")
 
     def enqueue_order(self, order_id, order_data):
-        logger.info("Starting order enqueue request")
-        with grpc.insecure_channel(self.order_queue_url) as channel:
-            stub = order_queue_grpc.OrderQueueServiceStub(channel)
-            response = stub.EnqueueOrder(
-                order_queue.OrderRequest(order_id=order_id, order_data=order_data)
-            )
-            logger.info("order_queue: enqueue order complete")
+        logger.info(f"Queue - Enqueue order {order_id}")
+        try:
+            with grpc.insecure_channel(self.order_queue_url) as channel:
+                stub = order_queue_grpc.OrderQueueServiceStub(channel)
+                response = stub.EnqueueOrder(
+                    order_queue.OrderRequest(order_id=order_id, order_data=order_data)
+                )
+                response_dict = MessageToDict(response)
+                if response_dict["result"] == "fail":
+                    raise Exception(f"Queue - Order Enqueue failed {order_id}")
 
-            response_dict = MessageToDict(response)
-            if response_dict["result"] == "fail":
-                logger.warning(f"ENQUEUE ORDER FAILED, {order_id}")
+                logger.info(f"Queue - Order {order_id} enqueued")
+        except Exception as e:
+            logger.error(f"Queue - Enqueue failed {order_id}: {e}")

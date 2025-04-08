@@ -14,7 +14,7 @@ import json
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 
 def execute_parallel(tasks):
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    with ThreadPoolExecutor() as executor:
         futures = [executor.submit(task[0], *task[1]) for task in tasks]
         for future in futures:
             future.result()
@@ -44,27 +44,30 @@ def checkout():
         order_id = str(uuid.uuid4())
 
         logger.info("Caching order data")
+
         init_tasks = [
             (service.fraud_init, (order_id, order_data)),
             (service.transaction_init, (order_id, order_data)),
             (service.suggestion_init, (order_id, order_data)),
         ]
         execute_parallel(init_tasks)
+
         logger.info("Order caching completed")
-        logger.info("Running order main Tasks")
+
+        logger.info("------- RUNNING order Tasks --------")
         order_tasks = [
             (service.verify_user, (order_id,)),
             (service.verify_address, (order_id,)),
-            (service.verify_credit_card, (order_id, )),
-            (service.check_user, (order_id, )),
-            (service.check_credit_card, (order_id, )),
+            (service.verify_credit_card, (order_id,)),
+            (service.check_user, (order_id,)),
+            (service.check_credit_card, (order_id,)),
         ]
         execute_parallel(order_tasks)
-        
+
         logger.info("---- Order Tasks Completed ------")
-        logger.info("Getting Book Suggestions")
+
         suggestions = service.get_suggestions(order_id)
-        logger.info("Getting Book Suggestion Complete")
+
         logger.info(f"----- FINAL vector clock ------: {service.vc}")
 
         service.enqueue_order(order_id, order_data)
@@ -96,7 +99,7 @@ def checkout():
         }
 
     finally:
-        logger.info("Cleaning order data")
+        logger.info("----- CLEANING order cache ------")
         cleanup_tasks = [
             (service.clean_fraud_order, (order_id,)),
             (service.clean_transaction_order, (order_id,)),

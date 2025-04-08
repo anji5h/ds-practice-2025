@@ -32,7 +32,7 @@ class TransactionVerificationService(
         self.svc_idx = svc_idx
         self.total_svcs = total_svcs
         self.orders = {}
-        self.lock = threading.Lock() 
+        self.lock = threading.Lock()
 
     def InitOrder(self, request, context):
         data = json.loads(request.order_data)
@@ -67,8 +67,10 @@ class TransactionVerificationService(
 
         response.result = (
             "fail"
-            if order_data["data"]["user"]["name"] == ""
-            or order_data["data"]["user"]["contact"] == ""
+            if (
+                order_data["data"]["user"]["name"] == ""
+                or order_data["data"]["user"]["contact"] == ""
+            )
             else "pass"
         )
         response.vc.extend(order_data["vc"])
