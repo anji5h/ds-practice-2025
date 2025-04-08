@@ -50,7 +50,8 @@ class SuggestionService(suggestion_grpc.SuggestionServiceServicer):
 
     def clean_order(self, order_id, local_vc, incoming_vc):
         if local_vc[self.svc_idx] <= incoming_vc[self.svc_idx]:
-            self.orders.pop(order_id)
+            if order_id in self.orders:
+                self.orders.pop(order_id)
             return True
         else:
             return False

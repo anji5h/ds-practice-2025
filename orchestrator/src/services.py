@@ -54,10 +54,14 @@ class OrchestratorService:
         self.transaction_verification_url = "transaction_verification:50052"
         self.suggestions_url = "suggestions:50053"
         self.order_queue_url = "order_queue:50054"
+
+        # local vector clock
         self.total_svcs = total_svcs
         self.vc = [0] * total_svcs
+        # thread event
         self.verify_user_event_status=Event()
         self.verify_credit_card_status=Event()
+        # thread locking
         self.lock=threading.Lock()
        
     def merge_and_increment(self, local_vc, incoming_vc):
@@ -88,7 +92,7 @@ class OrchestratorService:
             response = stub.CheckUser(
                 fraud_detection.FraudRequest(order_id=order_id, vc=self.vc)
             )
-            logger.info("fraud_detection: check_user  complete")       
+            logger.info("fraud_detection: check_user complete")
             response_dict = MessageToDict(response)
             logger.info(f"fraud_detection: current vector clock: {response_dict['vc']}")
 
@@ -106,9 +110,10 @@ class OrchestratorService:
             response = stub.CheckCreditCard(
                 fraud_detection.FraudRequest(order_id=order_id, vc=self.vc)
             )
-            logger.info("fraud_detection: check credit card process complete")
+            logger.info("fraud_detection: check_credit_card complete")
             response_dict = MessageToDict(response)
             logger.info(f"fraud_detection: current vector clock:{response_dict['vc']}")
+
             if response_dict["result"] == "fail":
                 raise Exception(f"FRAUD_DETECTION: CHECK USER FAILED")
 
@@ -155,9 +160,10 @@ class OrchestratorService:
                     order_id=order_id, vc=self.vc
                 )
             )
-            logger.info("transaction_verification: verify user complete")
+            logger.info("transaction_verification: verify_user complete")
             response_dict = MessageToDict(response)
             logger.info(f"transaction_verification: current vector clock:{response_dict['vc']}")
+
             if response_dict["result"] == "fail":
                 raise Exception(f"TRANSACTION VERIFICATION: USER VERIFY FAILED")
 
@@ -175,9 +181,10 @@ class OrchestratorService:
                     order_id=order_id, vc=self.vc
                 )
             )
-            logger.info("transaction_verification: verify credit card complete")
+            logger.info("transaction_verification: verify_credit_card complete")
             response_dict = MessageToDict(response)
             logger.info(f"transaction_verification: current vector clock:{response_dict['vc']}")
+
             if response_dict["result"] == "fail":
                 raise Exception(f"TRANSACTION VERIFICATION: CREDIT CARD VERIFY FAILED")
 
@@ -195,7 +202,7 @@ class OrchestratorService:
                     order_id=order_id, vc=self.vc
                 )
             )
-            logger.info("transaction_verification: verify address complete")
+            logger.info("transaction_verification: verify_address complete")
             response_dict = MessageToDict(response)
             logger.info(f"transaction_verification: current vector clock:{response_dict['vc']}")
             if response_dict["result"] == "fail":
