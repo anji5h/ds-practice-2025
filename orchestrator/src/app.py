@@ -51,30 +51,21 @@ def checkout():
         ]
         execute_parallel(init_tasks)
         logger.info("Order caching completed")
-
-        logger.info("Verifying order data")
-        verify_tasks = [
+        logger.info("Running order main Tasks")
+        order_tasks = [
             (service.verify_user, (order_id,)),
-            (service.verify_credit_card, (order_id,)),
             (service.verify_address, (order_id,)),
+            (service.verify_credit_card, (order_id, )),
+            (service.check_user, (order_id, )),
+            (service.check_credit_card, (order_id, )),
         ]
-        execute_parallel(verify_tasks)
-        logger.info("Verifying complete")
-        logger.info(f"Current vector clock: {service.vc}")
-
-        logger.info("Checking order data")
-        fraud_tasks = [
-            (service.check_credit_card, (order_id,)),
-            (service.check_user, (order_id,)),
-        ]
-        execute_parallel(fraud_tasks)
-        logger.info("Checking complete")
-        logger.info(f"Current vector clock: {service.vc}")
-
+        execute_parallel(order_tasks)
+        
+        logger.info("---- Order Tasks Completed ------")
         logger.info("Getting Book Suggestions")
         suggestions = service.get_suggestions(order_id)
         logger.info("Getting Book Suggestion Complete")
-        logger.info(f"Current vector clock: {service.vc}")
+        logger.info(f"----- FINAL vector clock ------: {service.vc}")
 
         service.enqueue_order(order_id, order_data)
 

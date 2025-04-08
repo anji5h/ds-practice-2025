@@ -1,8 +1,11 @@
 import sys
 import os
 import logging
+from threading import Event
+import threading
 
-# Configure logging
+
+# Configure logging 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -53,10 +56,14 @@ class OrchestratorService:
         self.order_queue_url = "order_queue:50054"
         self.total_svcs = total_svcs
         self.vc = [0] * total_svcs
-
+        self.verify_user_event_status=Event()
+        self.verify_credit_card_status=Event()
+        self.lock=threading.Lock()
+       
     def merge_and_increment(self, local_vc, incoming_vc):
-        for i in range(self.total_svcs):
-            local_vc[i] = max(local_vc[i], incoming_vc[i])
+        with self.lock:
+            for i in range(self.total_svcs):
+                local_vc[i] = max(local_vc[i], incoming_vc[i])
 
     def fraud_init(self, order_id, order_data):
         try:
@@ -74,32 +81,39 @@ class OrchestratorService:
             raise Exception(f"FRAUD_DETECTION: CACHING FAILED")
 
     def check_user(self, order_id):
+        self.verify_user_event_status.wait()
         logger.info(f"Starting check user request, order_id: {order_id}")
         with grpc.insecure_channel(self.fraud_detection_url) as channel:
             stub = fraud_detection_grpc.FraudServiceStub(channel)
             response = stub.CheckUser(
                 fraud_detection.FraudRequest(order_id=order_id, vc=self.vc)
             )
-            logger.info("fraud_detection: check_user complete")
+            logger.info("fraud_detection: check_user  complete")       
             response_dict = MessageToDict(response)
+            logger.info(f"fraud_detection: current vector clock: {response_dict['vc']}")
+
             if response_dict["result"] == "fail":
                 raise Exception(f"FRAUD_DETECTION: CHECK USER FAILED")
-
+            
             self.merge_and_increment(self.vc, response_dict["vc"])
+            
 
     def check_credit_card(self, order_id):
+        self.verify_credit_card_status.wait()
         logger.info(f"Starting check credit card request, order_id: {order_id}")
         with grpc.insecure_channel(self.fraud_detection_url) as channel:
             stub = fraud_detection_grpc.FraudServiceStub(channel)
             response = stub.CheckCreditCard(
                 fraud_detection.FraudRequest(order_id=order_id, vc=self.vc)
             )
-            logger.info("fraud_detection: check_user complete")
+            logger.info("fraud_detection: check credit card process complete")
             response_dict = MessageToDict(response)
+            logger.info(f"fraud_detection: current vector clock:{response_dict['vc']}")
             if response_dict["result"] == "fail":
                 raise Exception(f"FRAUD_DETECTION: CHECK USER FAILED")
 
             self.merge_and_increment(self.vc, response_dict["vc"])
+            
 
     def clean_fraud_order(self, order_id):
         logger.info(f"Starting fraud cleanup request, order_id: {order_id}")
@@ -143,11 +157,12 @@ class OrchestratorService:
             )
             logger.info("transaction_verification: verify user complete")
             response_dict = MessageToDict(response)
-
+            logger.info(f"transaction_verification: current vector clock:{response_dict['vc']}")
             if response_dict["result"] == "fail":
                 raise Exception(f"TRANSACTION VERIFICATION: USER VERIFY FAILED")
 
             self.merge_and_increment(self.vc, response_dict["vc"])
+            self.verify_user_event_status.set()
 
     def verify_credit_card(self, order_id):
         logger.info("Starting transaction verify credit card request")
@@ -162,11 +177,12 @@ class OrchestratorService:
             )
             logger.info("transaction_verification: verify credit card complete")
             response_dict = MessageToDict(response)
-
+            logger.info(f"transaction_verification: current vector clock:{response_dict['vc']}")
             if response_dict["result"] == "fail":
                 raise Exception(f"TRANSACTION VERIFICATION: CREDIT CARD VERIFY FAILED")
 
             self.merge_and_increment(self.vc, response_dict["vc"])
+            self.verify_credit_card_status.set()
 
     def verify_address(self, order_id):
         logger.info("Starting transaction verify address request")
@@ -181,7 +197,7 @@ class OrchestratorService:
             )
             logger.info("transaction_verification: verify address complete")
             response_dict = MessageToDict(response)
-
+            logger.info(f"transaction_verification: current vector clock:{response_dict['vc']}")
             if response_dict["result"] == "fail":
                 raise Exception(f"TRANSACTION VERIFICATION: ADDRESS VERIFY FAILED")
 
@@ -226,8 +242,9 @@ class OrchestratorService:
                     suggestions.SuggestionRequest(order_id=order_id, vc=self.vc)
                 )
                 logger.info("suggestions: get_suggestions complete")
-
+                
                 response_dict = MessageToDict(response)
+                logger.info(f"transaction_verification: current vector clock:{response_dict['vc']}")
                 self.merge_and_increment(self.vc, response_dict["vc"])
 
                 return response_dict.get("suggestedBooks", [])
