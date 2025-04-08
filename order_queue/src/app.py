@@ -3,7 +3,15 @@ import sys
 import threading
 import heapq
 import grpc
+import logging
 from concurrent import futures
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+)
+logger = logging.getLogger(__name__)
 
 # This set of lines are needed to import the gRPC stubs.
 # The path of the stubs is relative to the current file, or absolute inside the container.
@@ -25,9 +33,10 @@ class OrderQueueService(order_queue_grpc.OrderQueueServiceServicer):
         self._queue = []
 
     def _log_queue_state(self):
-        print("current queue state: ")
+        queue_state = []
         for idx, (priority, order_id, _) in enumerate(self._queue):
-            print(f"idx {idx + 1}: order_id = {order_id}, priority = {priority}")
+            queue_state.append(f"idx {idx + 1}: order_id = {order_id}, priority = {priority}")
+        logger.debug("Current queue state:\n" + "\n".join(queue_state))
 
     def _get_priority(self, order_id: str) -> int:
         first_char = order_id[0].lower()
@@ -45,12 +54,13 @@ class OrderQueueService(order_queue_grpc.OrderQueueServiceServicer):
 
                 priority = self._get_priority(order_id)
                 heapq.heappush(self._queue, (priority, order_id, order_data))
-                print(f"Order {order_id} enqueued")
+                logger.info(f"Order {order_id} enqueued with priority {priority}")
                 self._log_queue_state()
 
                 response.result = "pass"
                 return response
-        except:
+        except Exception as e:
+            logger.error(f"Failed to enqueue order {order_id}: {str(e)}")
             response.result = "fail"
             return response
 
@@ -59,18 +69,21 @@ class OrderQueueService(order_queue_grpc.OrderQueueServiceServicer):
         try:
             with self._lock:
                 if not self._queue:
+                    logger.debug("Dequeue attempted but queue is empty")
                     response.available = False
                     return response
 
                 _, order_id, order_data = heapq.heappop(self._queue)
-                print(f"Order {order_id} dequed")
+                logger.info(f"Order {order_id} dequeued")
+                self._log_queue_state()
 
                 response.order_id = order_id
                 response.order_data = order_data
                 response.available = True
 
                 return response
-        except:
+        except Exception as e:
+            logger.error(f"Failed to dequeue order: {str(e)}")
             response.available = False
             return response
 
@@ -82,7 +95,7 @@ def serve_queue_service():
     )
     port = 50054
     server.add_insecure_port(f"[::]:{port}")
-    print(f"Order Queue Service started on port {port}")
+    logger.info(f"Order Queue Service started on port {port}")
     server.start()
     server.wait_for_termination()
 
