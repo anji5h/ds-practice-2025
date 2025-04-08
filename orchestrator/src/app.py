@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 # Flask is a web framework for Python.
 # It allows you to build a web application quickly.
 # For more information, see https://flask.palletsprojects.com/en/latest/
-from flask import Flask, request, jsonify
+from flask import Flask, request
 from flask_cors import CORS
 import json
 

@@ -20,7 +20,7 @@ class Config:
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
     GRPC_CHANNEL: str = "order_queue:50054"
-    HEARTBEAT_TIMEOUT: int = 6
+    HEARTBEAT_TIMEOUT: int = 10
     ELECTION_LOCK_TTL: int = 5
     CRASH_PROBABILITY: float = 0.05
     POLL_INTERVAL: int = 3
