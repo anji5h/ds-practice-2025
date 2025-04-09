@@ -1,18 +1,30 @@
 syntax = "proto3";
 
-package suggestions;
+import "google/protobuf/empty.proto";
 
-// The request message for GetSuggestions
-message SuggestionsRequest {
-  string query = 1;  // This is the field you want to access in the Python code
+package suggestion;
+
+service SuggestionService {
+    rpc InitOrder(OrderRequest) returns (google.protobuf.Empty);
+    rpc GetSuggestions (SuggestionRequest) returns (SuggestionsResponse);
+    rpc CleanOrder (SuggestionRequest) returns (CleanOrderResponse);
 }
 
-// The response message for GetSuggestions
-message SuggestionsResponse {
-  repeated Book suggestedBooks = 1;
+message OrderRequest{
+    string order_id = 1;
+    string order_data = 2;
 }
 
-// Book message definition
+message SuggestionRequest {
+    string order_id = 1;
+    repeated int32 vc = 2;
+}
+
+message CleanOrderResponse{
+    string result = 1;
+    repeated int32 vc = 2;
+}
+
 message Book {
   string title = 1;
   string author = 2;
@@ -20,7 +32,7 @@ message Book {
   string link = 4;
 }
 
-// SuggestionService service definition
-service SuggestionService {
-  rpc GetSuggestions(SuggestionsRequest) returns (SuggestionsResponse);
+message SuggestionsResponse {
+  repeated Book suggestedBooks = 1;
+  repeated int32 vc = 2;
 }

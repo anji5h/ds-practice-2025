@@ -1,7 +1,8 @@
 import sys
 import time
 import subprocess
-from watchdog.observers import Observer
+import logging
+from watchdog.observers.polling import PollingObserver as Observer
 from watchdog.events import FileSystemEventHandler
 
 
@@ -15,6 +16,10 @@ python hotreload.py <script>
 """
 
 DIR_TO_WATCH = '/app'
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%H:%M:%S')
+
 
 class OnAnyModifiedFileHandler(FileSystemEventHandler):
     def __init__(self, script, process):
@@ -40,8 +45,7 @@ class OnAnyModifiedFileHandler(FileSystemEventHandler):
                 del self.pending_files[file_path]
 
         if files_to_restart:
-            print(f"Detected closed files: {files_to_restart}. Restarting: {self.script}")
-            sys.stdout.flush()
+            logging.info(f"Detected closed files: {files_to_restart}. Restarting: {self.script}")
             self.restart_script()
 
     def restart_script(self):
@@ -72,6 +76,6 @@ def main(script):
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        print(f'Usage: {sys.argv[0]} <script>')
+        logging.error(f'Usage: {sys.argv[0]} <script>')
         sys.exit(1)
     main(sys.argv[1])

@@ -2,17 +2,29 @@
 
 syntax = "proto3";
 
+import "google/protobuf/empty.proto";
+
 package transaction;
 
 service TransactionVerificationService {
-    rpc VerifyTransaction (TransactionRequest) returns (TransactionVerificationResponse);
+    rpc InitOrder(OrderRequest) returns (google.protobuf.Empty);
+    rpc VerifyUser(TransactionRequest) returns (TransactionResponse);
+    rpc VerifyAddress(TransactionRequest) returns (TransactionResponse);
+    rpc VerifyCreditCard(TransactionRequest) returns (TransactionResponse);
+    rpc CleanOrder(TransactionRequest) returns (TransactionResponse);
+}
+
+message OrderRequest{
+    string order_id = 1;
+    string order_data = 2;
 }
 
 message TransactionRequest {
-    string id = 1;
-    int32 cvv = 2;
+    string order_id = 1;
+    repeated int32 vc = 2;
 }
 
-message TransactionVerificationResponse {
-    bool is_verified = 1;
+message TransactionResponse {
+    string result = 1;
+    repeated int32 vc = 2;
 }

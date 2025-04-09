@@ -22,19 +22,22 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15\x66raud_detection.proto\x12\x05hello\"\x1e\n\x0c\x46raudRequest\x12\x0e\n\x06number\x18\x01 \x01(\t\"!\n\rFraudResponse\x12\x10\n\x08is_fraud\x18\x01 \x01(\x08\x32G\n\x0c\x46raudService\x12\x37\n\nCheckFraud\x12\x13.hello.FraudRequest\x1a\x14.hello.FraudResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15\x66raud_detection.proto\x12\x05\x66raud\x1a\x1bgoogle/protobuf/empty.proto\"4\n\x0cOrderRequest\x12\x10\n\x08order_id\x18\x01 \x01(\t\x12\x12\n\norder_data\x18\x02 \x01(\t\",\n\x0c\x46raudRequest\x12\x10\n\x08order_id\x18\x01 \x01(\t\x12\n\n\x02vc\x18\x02 \x03(\x05\"+\n\rFraudResponse\x12\x0e\n\x06result\x18\x01 \x01(\t\x12\n\n\x02vc\x18\x02 \x03(\x05\x32\xf7\x01\n\x0c\x46raudService\x12\x38\n\tInitOrder\x12\x13.fraud.OrderRequest\x1a\x16.google.protobuf.Empty\x12\x36\n\tCheckUser\x12\x13.fraud.FraudRequest\x1a\x14.fraud.FraudResponse\x12<\n\x0f\x43heckCreditCard\x12\x13.fraud.FraudRequest\x1a\x14.fraud.FraudResponse\x12\x37\n\nCleanOrder\x12\x13.fraud.FraudRequest\x1a\x14.fraud.FraudResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'fraud_detection_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_FRAUDREQUEST']._serialized_start=32
-  _globals['_FRAUDREQUEST']._serialized_end=62
-  _globals['_FRAUDRESPONSE']._serialized_start=64
-  _globals['_FRAUDRESPONSE']._serialized_end=97
-  _globals['_FRAUDSERVICE']._serialized_start=99
-  _globals['_FRAUDSERVICE']._serialized_end=170
+  _globals['_ORDERREQUEST']._serialized_start=61
+  _globals['_ORDERREQUEST']._serialized_end=113
+  _globals['_FRAUDREQUEST']._serialized_start=115
+  _globals['_FRAUDREQUEST']._serialized_end=159
+  _globals['_FRAUDRESPONSE']._serialized_start=161
+  _globals['_FRAUDRESPONSE']._serialized_end=204
+  _globals['_FRAUDSERVICE']._serialized_start=207
+  _globals['_FRAUDSERVICE']._serialized_end=454
 # @@protoc_insertion_point(module_scope)
