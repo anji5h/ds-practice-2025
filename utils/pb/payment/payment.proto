@@ -8,7 +8,6 @@ service PaymentService {
 
 message PrepareRequest {
     string transaction_id = 1;
-    double amount = 2;
 }
 
 message CommitRequest {
@@ -20,7 +19,7 @@ message AbortRequest {
 }
 
 message Vote {
-    bool vote = 1;
+    bool ready = 1;
 }
 
 message Ack {

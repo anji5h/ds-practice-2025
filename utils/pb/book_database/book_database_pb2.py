@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13\x62ook_database.proto\x12\rbook_database\"\x1b\n\x0bReadRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\"\x1d\n\x0cReadResponse\x12\r\n\x05stock\x18\x01 \x01(\x05\"/\n\x0cWriteRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x11\n\tnew_stock\x18\x02 \x01(\x05\" \n\rWriteResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\"2\n\x10\x44\x65\x63rementRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x10\n\x08quantity\x18\x02 \x01(\x05\"2\n\x10IncrementRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x10\n\x08quantity\x18\x02 \x01(\x05\"E\n\nCASRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x16\n\x0e\x65xpected_value\x18\x02 \x01(\x05\x12\x11\n\tnew_value\x18\x03 \x01(\x05\x32\x81\x03\n\rBooksDatabase\x12?\n\x04Read\x12\x1a.book_database.ReadRequest\x1a\x1b.book_database.ReadResponse\x12\x42\n\x05Write\x12\x1b.book_database.WriteRequest\x1a\x1c.book_database.WriteResponse\x12O\n\x0e\x44\x65\x63rementStock\x12\x1f.book_database.DecrementRequest\x1a\x1c.book_database.WriteResponse\x12O\n\x0eIncrementStock\x12\x1f.book_database.IncrementRequest\x1a\x1c.book_database.WriteResponse\x12I\n\x0e\x43ompareAndSwap\x12\x19.book_database.CASRequest\x1a\x1c.book_database.WriteResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13\x62ook_database.proto\x12\rbook_database\"\x1b\n\x0bReadRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\"\x1d\n\x0cReadResponse\x12\r\n\x05stock\x18\x01 \x01(\x05\"/\n\x0cWriteRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x11\n\tnew_stock\x18\x02 \x01(\x05\" \n\rWriteResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\"2\n\x10\x44\x65\x63rementRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x10\n\x08quantity\x18\x02 \x01(\x05\"2\n\x10IncrementRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x10\n\x08quantity\x18\x02 \x01(\x05\"E\n\nCASRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x16\n\x0e\x65xpected_value\x18\x02 \x01(\x05\x12\x11\n\tnew_value\x18\x03 \x01(\x05\"H\n\x0ePrepareRequest\x12\x16\n\x0etransaction_id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x10\n\x08quantity\x18\x03 \x01(\x05\"\'\n\rCommitRequest\x12\x16\n\x0etransaction_id\x18\x01 \x01(\t\"&\n\x0c\x41\x62ortRequest\x12\x16\n\x0etransaction_id\x18\x01 \x01(\t\"\x15\n\x04Vote\x12\r\n\x05ready\x18\x01 \x01(\x08\"\x16\n\x03\x41\x63k\x12\x0f\n\x07success\x18\x01 \x01(\x08\x32\xb6\x04\n\rBooksDatabase\x12?\n\x04Read\x12\x1a.book_database.ReadRequest\x1a\x1b.book_database.ReadResponse\x12\x42\n\x05Write\x12\x1b.book_database.WriteRequest\x1a\x1c.book_database.WriteResponse\x12O\n\x0e\x44\x65\x63rementStock\x12\x1f.book_database.DecrementRequest\x1a\x1c.book_database.WriteResponse\x12O\n\x0eIncrementStock\x12\x1f.book_database.IncrementRequest\x1a\x1c.book_database.WriteResponse\x12I\n\x0e\x43ompareAndSwap\x12\x19.book_database.CASRequest\x1a\x1c.book_database.WriteResponse\x12=\n\x07Prepare\x12\x1d.book_database.PrepareRequest\x1a\x13.book_database.Vote\x12:\n\x06\x43ommit\x12\x1c.book_database.CommitRequest\x1a\x12.book_database.Ack\x12\x38\n\x05\x41\x62ort\x12\x1b.book_database.AbortRequest\x1a\x12.book_database.Ackb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -45,6 +45,16 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_INCREMENTREQUEST']._serialized_end=283
   _globals['_CASREQUEST']._serialized_start=285
   _globals['_CASREQUEST']._serialized_end=354
-  _globals['_BOOKSDATABASE']._serialized_start=357
-  _globals['_BOOKSDATABASE']._serialized_end=742
+  _globals['_PREPAREREQUEST']._serialized_start=356
+  _globals['_PREPAREREQUEST']._serialized_end=428
+  _globals['_COMMITREQUEST']._serialized_start=430
+  _globals['_COMMITREQUEST']._serialized_end=469
+  _globals['_ABORTREQUEST']._serialized_start=471
+  _globals['_ABORTREQUEST']._serialized_end=509
+  _globals['_VOTE']._serialized_start=511
+  _globals['_VOTE']._serialized_end=532
+  _globals['_ACK']._serialized_start=534
+  _globals['_ACK']._serialized_end=556
+  _globals['_BOOKSDATABASE']._serialized_start=559
+  _globals['_BOOKSDATABASE']._serialized_end=1125
 # @@protoc_insertion_point(module_scope)

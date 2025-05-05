@@ -9,6 +9,10 @@ service BooksDatabase {
     rpc DecrementStock (DecrementRequest) returns (WriteResponse);
     rpc IncrementStock (IncrementRequest) returns (WriteResponse);
     rpc CompareAndSwap (CASRequest) returns (WriteResponse);
+
+    rpc Prepare (PrepareRequest) returns (Vote);
+    rpc Commit (CommitRequest) returns (Ack);
+    rpc Abort (AbortRequest) returns (Ack);
 }
 
 message ReadRequest {
@@ -42,4 +46,26 @@ message CASRequest {
     string name = 1;
     int32 expected_value = 2;
     int32 new_value = 3;
+}
+
+message PrepareRequest {
+    string transaction_id = 1;
+    string name = 2;
+    int32 quantity = 3;
+}
+
+message CommitRequest {
+    string transaction_id = 1;
+}
+
+message AbortRequest {
+    string transaction_id = 1;
+}
+
+message Vote {
+    bool ready = 1;
+}
+
+message Ack {
+    bool success = 1;
 }

@@ -1,9 +1,6 @@
-# Configure logging
-import json
 import logging
 import os
 import sys
-
 import grpc
 
 logging.basicConfig(level=logging.INFO)
@@ -18,7 +15,6 @@ sys.path.insert(0, book_database_grpc_path)
 
 import book_database_pb2 as books_pb2
 import book_database_pb2_grpc as books_pb2_grpc
-
 
 class DatabaseClient:
     def __init__(self, host='book_database_primary', port=50055):
@@ -75,4 +71,38 @@ class DatabaseClient:
             return response.success
         except grpc.RpcError as e:
             print(f"CAS failed: {e.code()}: {e.details()}")
+            return False
+    
+    def prepare_update(self, transaction_id, name, quantity):
+        try:
+            response = self.stub.Prepare(
+                books_pb2.PrepareRequest(
+                    transaction_id=transaction_id,
+                    name=name,
+                    quantity=quantity
+                )
+            )
+            return response.ready
+        except grpc.RpcError as e:
+            print(f"Prepare failed: {e.code()}: {e.details()}")
+            return False
+
+    def commit_update(self, transaction_id):
+        try:
+            response = self.stub.Commit(
+                books_pb2.CommitRequest(transaction_id=transaction_id)
+            )
+            return response.success
+        except grpc.RpcError as e:
+            print(f"Commit failed: {e.code()}: {e.details()}")
+            return False
+
+    def abort_update(self, transaction_id):
+        try:
+            response = self.stub.Abort(
+                books_pb2.AbortRequest(transaction_id=transaction_id)
+            )
+            return response.success
+        except grpc.RpcError as e:
+            print(f"Abort failed: {e.code()}: {e.details()}")
             return False

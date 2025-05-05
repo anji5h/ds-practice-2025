@@ -1,3 +1,4 @@
+from collections import defaultdict
 import os
 import sys
 import threading
@@ -7,23 +8,26 @@ from concurrent import futures
 
 # Configure logging with more detailed format
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 # gRPC stub import setup
 FILE = __file__ if "__file__" in globals() else os.getenv("PYTHONFILE", "")
-book_database_grpc_path = os.path.abspath(os.path.join(FILE, "../../../utils/pb/book_database"))
+book_database_grpc_path = os.path.abspath(
+    os.path.join(FILE, "../../../utils/pb/book_database")
+)
 sys.path.insert(0, book_database_grpc_path)
 
 import book_database_pb2 as books_pb2
 import book_database_pb2_grpc as books_pb2_grpc
 
+
 class BooksDatabaseServicer(books_pb2_grpc.BooksDatabaseServicer):
     def __init__(self):
         self.store = {}
-        self.prepared_updates = {} 
+        self.prepared_updates = {}
+        self.pending_decrements = defaultdict(int)
         self.lock = threading.Lock()
         logger.info("Initialized BooksDatabaseServicer")
 
@@ -35,50 +39,66 @@ class BooksDatabaseServicer(books_pb2_grpc.BooksDatabaseServicer):
         return books_pb2.ReadResponse(stock=stock)
 
     def Write(self, request, context):
-        logger.info(f"Write request for book: {request.name}, new_stock: {request.new_stock}")
+        logger.info(
+            f"Write request for book: {request.name}, new_stock: {request.new_stock}"
+        )
         with self.lock:
             self.store[request.name] = request.new_stock
         logger.debug(f"Updated stock for {request.name} to {request.new_stock}")
         return books_pb2.WriteResponse(success=True)
-    
-    def PrepareUpdate(self, request, context):
-        logger.info(f"Prepare request for txn {request.transaction_id} on {request.name}")
+
+    def Prepare(self, request, context):
+        logger.info(f"Prepare request for txn {request.transaction_id}")
         with self.lock:
-            # Validate stock availability
             current = self.store.get(request.name, 0)
-            if request.new_stock < 0:
-                logger.warning(f"Prepare failed: Negative stock for {request.name}")
+            pending = self.pending_decrements.get(request.name, 0)
+            available = current - pending
+
+            if available < request.quantity:
+                logger.warning(f"Prepare failed: Insufficient stock for {request.name}")
                 return books_pb2.Vote(ready=False)
-            
-            # Tentatively store the update
-            self.prepared_updates[request.transaction_id] = (request.name, request.new_stock)
+
+            self.pending_decrements[request.name] += request.quantity
+            self.prepared_updates[request.transaction_id] = (
+                request.name,
+                request.quantity,
+            )
             return books_pb2.Vote(ready=True)
 
-    def CommitUpdate(self, request, context):
+    def Commit(self, request, context):
         logger.info(f"Commit request for txn {request.transaction_id}")
         with self.lock:
             if request.transaction_id in self.prepared_updates:
-                name, new_stock = self.prepared_updates.pop(request.transaction_id)
-                self.store[name] = new_stock
-                logger.info(f"Committed update for {name} to {new_stock}")
+                name, quantity = self.prepared_updates.pop(request.transaction_id)
+                self.store[name] = self.store.get(name, 0) - quantity
+                self.pending_decrements[name] -= quantity
+                if self.pending_decrements[name] == 0:
+                    del self.pending_decrements[name]
+                logger.info(f"Committed {quantity} decrement for {name}")
                 return books_pb2.Ack(success=True)
             return books_pb2.Ack(success=False)
 
-    def AbortUpdate(self, request, context):
+    def Abort(self, request, context):
         logger.info(f"Abort request for txn {request.transaction_id}")
         with self.lock:
             if request.transaction_id in self.prepared_updates:
-                self.prepared_updates.pop(request.transaction_id)
-                logger.info(f"Aborted transaction {request.transaction_id}")
+                name, quantity = self.prepared_updates.pop(request.transaction_id)
+                self.pending_decrements[name] -= quantity
+                if self.pending_decrements[name] == 0:
+                    del self.pending_decrements[name]
+                logger.info(f"Aborted {quantity} decrement for {name}")
                 return books_pb2.Ack(success=True)
             return books_pb2.Ack(success=False)
+
 
 class PrimaryReplica(BooksDatabaseServicer):
     def __init__(self, backup_addresses):
         super().__init__()
         self.backups = [self._create_backup_stub(addr) for addr in backup_addresses]
         self.repl_lock = threading.Lock()
-        logger.info(f"Initialized PrimaryReplica with {len(backup_addresses)} backups: {backup_addresses}")
+        logger.info(
+            f"Initialized PrimaryReplica with {len(backup_addresses)} backups: {backup_addresses}"
+        )
 
     def _create_backup_stub(self, address):
         logger.info(f"Creating backup stub for address: {address}")
@@ -86,7 +106,9 @@ class PrimaryReplica(BooksDatabaseServicer):
         return books_pb2_grpc.BooksDatabaseStub(channel)
 
     def _replicate_write(self, request):
-        logger.info(f"Replicating write for book: {request.name}, new_stock: {request.new_stock}")
+        logger.info(
+            f"Replicating write for book: {request.name}, new_stock: {request.new_stock}"
+        )
         success_count = 1
         for i, backup in enumerate(self.backups):
             try:
@@ -96,54 +118,61 @@ class PrimaryReplica(BooksDatabaseServicer):
             except grpc.RpcError as e:
                 logger.error(f"Replication failed to backup {i}: {e}")
         required_success = (len(self.backups) + 1) // 2 + 1
-        logger.info(f"Replication complete: {success_count}/{required_success} successful")
+        logger.info(
+            f"Replication complete: {success_count}/{required_success} successful"
+        )
         return success_count >= required_success
-    
+
     def _replicate_2pc(self, request, operation):
-        """Helper method to replicate 2PC operations to backups"""
         success_count = 1
         for backup in self.backups:
             try:
-                if operation == 'prepare':
-                    backup.PrepareUpdate(request)
-                elif operation == 'commit':
-                    backup.CommitUpdate(request)
-                elif operation == 'abort':
-                    backup.AbortUpdate(request)
+                if operation == "prepare":
+                    backup.Prepare(request)
+                elif operation == "commit":
+                    backup.Commit(request)
+                elif operation == "abort":
+                    backup.Abort(request)
                 success_count += 1
             except grpc.RpcError as e:
                 logger.error(f"Replication failed: {e}")
-        return success_count >= ((len(self.backups) + 1) // 2 + 1)
+        required_success = (len(self.backups) + 1) // 2 + 1
+        logger.info(
+            f"Replication complete: {success_count}/{required_success} successful"
+        )
+        return success_count >= required_success
 
-    def PrepareUpdate(self, request, context):
+    def Prepare(self, request, context):
         logger.info(f"Primary preparing txn {request.transaction_id}")
-        result = super().PrepareUpdate(request, context)
+        result = super().Prepare(request, context)
         if result.ready:
-            if not self._replicate_2pc(request, 'prepare'):
+            if not self._replicate_2pc(request, "prepare"):
                 logger.error("Prepare replication failed")
                 return books_pb2.Vote(ready=False)
         return result
 
-    def CommitUpdate(self, request, context):
+    def Commit(self, request, context):
         logger.info(f"Primary committing txn {request.transaction_id}")
-        result = super().CommitUpdate(request, context)
+        result = super().Commit(request, context)
         if result.success:
-            if not self._replicate_2pc(request, 'commit'):
+            if not self._replicate_2pc(request, "commit"):
                 logger.error("Commit replication failed")
                 return books_pb2.Ack(success=False)
         return result
 
-    def AbortUpdate(self, request, context):
+    def Abort(self, request, context):
         logger.info(f"Primary aborting txn {request.transaction_id}")
-        result = super().AbortUpdate(request, context)
+        result = super().Abort(request, context)
         if result.success:
-            if not self._replicate_2pc(request, 'abort'):
+            if not self._replicate_2pc(request, "abort"):
                 logger.error("Abort replication failed")
                 return books_pb2.Ack(success=False)
         return result
 
     def Write(self, request, context):
-        logger.info(f"Processing Write for book: {request.name}, new_stock: {request.new_stock}")
+        logger.info(
+            f"Processing Write for book: {request.name}, new_stock: {request.new_stock}"
+        )
         with self.lock:
             self.store[request.name] = request.new_stock
             logger.debug(f"Local write completed for {request.name}")
@@ -152,72 +181,76 @@ class PrimaryReplica(BooksDatabaseServicer):
         return books_pb2.WriteResponse(success=success)
 
     def DecrementStock(self, request, context):
-        logger.info(f"DecrementStock request for book: {request.name}, quantity: {request.quantity}")
+        logger.info(
+            f"DecrementStock request for book: {request.name}, quantity: {request.quantity}"
+        )
         with self.lock:
             current = self.store.get(request.name, 0)
             if current < request.quantity:
-                logger.warning(f"Insufficient stock for {request.name}: current={current}, requested={request.quantity}")
+                logger.warning(
+                    f"Insufficient stock for {request.name}: current={current}, requested={request.quantity}"
+                )
                 return books_pb2.WriteResponse(success=False)
             new_stock = current - request.quantity
-            self.store[request.name] = new_stock
             logger.debug(f"Decremented stock for {request.name} to {new_stock}")
-        
-        write_request = books_pb2.WriteRequest(
-            name=request.name, 
-            new_stock=new_stock
-        )
+
+        write_request = books_pb2.WriteRequest(name=request.name, new_stock=new_stock)
         return self.Write(write_request, context)
 
     def IncrementStock(self, request, context):
-        logger.info(f"IncrementStock request for book: {request.name}, quantity: {request.quantity}")
+        logger.info(
+            f"IncrementStock request for book: {request.name}, quantity: {request.quantity}"
+        )
         with self.lock:
             current = self.store.get(request.name, 0)
             new_stock = current + request.quantity
-            self.store[request.name] = new_stock
             logger.debug(f"Incremented stock for {request.name} to {new_stock}")
-        
-        write_request = books_pb2.WriteRequest(
-            name=request.name, 
-            new_stock=new_stock
-        )
+
+        write_request = books_pb2.WriteRequest(name=request.name, new_stock=new_stock)
         return self.Write(write_request, context)
 
     def CompareAndSwap(self, request, context):
-        logger.info(f"CompareAndSwap request for book: {request.name}, expected: {request.expected_value}, new: {request.new_value}")
+        logger.info(
+            f"CompareAndSwap request for book: {request.name}, expected: {request.expected_value}, new: {request.new_value}"
+        )
         with self.lock:
             current = self.store.get(request.name, 0)
             if current != request.expected_value:
-                logger.warning(f"CompareAndSwap failed for {request.name}: current={current}, expected={request.expected_value}")
+                logger.warning(
+                    f"CompareAndSwap failed for {request.name}: current={current}, expected={request.expected_value}"
+                )
                 return books_pb2.WriteResponse(success=False)
-            self.store[request.name] = request.new_value
-            logger.debug(f"CompareAndSwap updated {request.name} to {request.new_value}")
-        
+            logger.debug(
+                f"CompareAndSwap updated {request.name} to {request.new_value}"
+            )
+
         write_request = books_pb2.WriteRequest(
-            name=request.name, 
-            new_stock=request.new_value
+            name=request.name, new_stock=request.new_value
         )
         return self.Write(write_request, context)
 
+
 def serve():
-    is_primary = os.getenv('IS_PRIMARY', 'false').lower() == 'true'
-    backup_addresses = os.getenv('BACKUP_ADDRESSES', '').split(',') if is_primary else []
-    logger.info(f"Starting server (is_primary={is_primary}) with backup addresses: {backup_addresses}")
-    
+    is_primary = os.getenv("IS_PRIMARY", "false").lower() == "true"
+    backup_addresses = (
+        os.getenv("BACKUP_ADDRESSES", "").split(",") if is_primary else []
+    )
+    logger.info(
+        f"Starting server (is_primary={is_primary}) with backup addresses: {backup_addresses}"
+    )
+
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     books_pb2_grpc.add_BooksDatabaseServicer_to_server(
         PrimaryReplica(backup_addresses) if is_primary else BooksDatabaseServicer(),
-        server
+        server,
     )
-    port = os.getenv('PORT', '50055')
-    server.add_insecure_port(f'[::]:{port}')
+    port = os.getenv("PORT", "50055")
+    server.add_insecure_port(f"[::]:{port}")
     logger.info(f"Server binding to port {port}")
     server.start()
     logger.info(f"Server started successfully on port {port}")
-    try:
-        server.wait_for_termination()
-    except KeyboardInterrupt:
-        logger.info("Server shutting down")
-        server.stop(0)
+    server.wait_for_termination()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     serve()
