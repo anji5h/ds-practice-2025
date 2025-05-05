@@ -43,32 +43,32 @@ def checkout():
         order_data = json.dumps(request_data)
         order_id = str(uuid.uuid4())
 
-        logger.info("Caching order data")
+        # logger.info("Caching order data")
 
-        init_tasks = [
-            (service.fraud_init, (order_id, order_data)),
-            (service.transaction_init, (order_id, order_data)),
-            (service.suggestion_init, (order_id, order_data)),
-        ]
-        execute_parallel(init_tasks)
+        # init_tasks = [
+        #     (service.fraud_init, (order_id, order_data)),
+        #     (service.transaction_init, (order_id, order_data)),
+        #     (service.suggestion_init, (order_id, order_data)),
+        # ]
+        # execute_parallel(init_tasks)
 
-        logger.info("Order caching completed")
+        # logger.info("Order caching completed")
 
-        logger.info("------- RUNNING order Tasks --------")
-        order_tasks = [
-            (service.verify_user, (order_id,)),
-            (service.verify_address, (order_id,)),
-            (service.verify_credit_card, (order_id,)),
-            (service.check_user, (order_id,)),
-            (service.check_credit_card, (order_id,)),
-        ]
-        execute_parallel(order_tasks)
+        # logger.info("------- RUNNING order Tasks --------")
+        # order_tasks = [
+        #     (service.verify_user, (order_id,)),
+        #     (service.verify_address, (order_id,)),
+        #     (service.verify_credit_card, (order_id,)),
+        #     (service.check_user, (order_id,)),
+        #     (service.check_credit_card, (order_id,)),
+        # ]
+        # execute_parallel(order_tasks)
 
-        logger.info("---- Order Tasks Completed ------")
+        # logger.info("---- Order Tasks Completed ------")
 
-        suggestions = service.get_suggestions(order_id)
+        # suggestions = service.get_suggestions(order_id)
 
-        logger.info(f"----- FINAL vector clock ------: {service.vc}")
+        # logger.info(f"----- FINAL vector clock ------: {service.vc}")
 
         service.enqueue_order(order_id, order_data)
 
@@ -79,12 +79,12 @@ def checkout():
             "status": "Order Approved",
             "suggestedBooks": [
                 {
-                    "bookId": str(i + 1),
-                    "title": book["title"],
-                    "author": book["author"],
-                    "link": book["link"],
+                    "bookId": "1",
+                    "title": "demo tile",
+                    "author": "demo author",
+                    "link": "https://demo.com",
                 }
-                for i, book in enumerate(suggestions)
+                # for i, book in enumerate(suggestions)
             ],
         }
 
@@ -98,14 +98,14 @@ def checkout():
             "suggestedBooks": [],
         }
 
-    finally:
-        logger.info("----- CLEANING order cache ------")
-        cleanup_tasks = [
-            (service.clean_fraud_order, (order_id,)),
-            (service.clean_transaction_order, (order_id,)),
-            (service.clean_suggestion_order, (order_id,)),
-        ]
-        execute_parallel(cleanup_tasks)
+    # finally:
+    #     logger.info("----- CLEANING order cache ------")
+    #     cleanup_tasks = [
+    #         (service.clean_fraud_order, (order_id,)),
+    #         (service.clean_transaction_order, (order_id,)),
+    #         (service.clean_suggestion_order, (order_id,)),
+    #     ]
+    #     execute_parallel(cleanup_tasks)
 
 
 if __name__ == "__main__":

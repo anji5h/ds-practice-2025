@@ -12,6 +12,7 @@ services:
     volumes:
       # Mount the frontend directory
       - ./frontend/src:/usr/share/nginx/html
+
   orchestrator:
     build:
       # Use the current directory as the build context
@@ -34,6 +35,7 @@ services:
       - ./utils:/app/utils
       # Mount the orchestrator/src directory in the current directory to the /app/orchestrator/src directory in the container
       - ./orchestrator/src:/app/orchestrator/src
+
   fraud_detection:
     build:
       # Use the current directory as the build context
@@ -79,6 +81,7 @@ services:
       - ./utils:/app/utils
       # Mount the fraud_detection/src directory in the current directory to the /app/fraud_detection/src directory in the container
       - ./suggestions/src:/app/suggestions/src
+
   transaction_verification:
     build:
       # Use the current directory as the build context
@@ -126,7 +129,7 @@ services:
       - ./order_queue/src:/app/order_queue/src
   
   redis:
-    image: redis:alpine
+    image: redis:latest
     ports:
       - "6379:6379"
   
@@ -153,3 +156,79 @@ services:
       replicas: 3
     depends_on:
       - redis
+  
+  book_database_primary:
+    build:
+      # Use the current directory as the build context
+      # This allows us to access the files in the current directory inside the Dockerfile
+      context: ./
+      # Use the Dockerfile in the transaction_verification directorys
+      dockerfile: ./book_database/Dockerfile
+    ports:
+      # Expose port 50052 on the host, and map port 50051 of the container to port 50052 on the host
+      - 50055:50055
+    environment:
+      # Pass the environment variables to the container
+      # The PYTHONUNBUFFERED environment variable ensures that the output from the application is logged to the console
+      - PYTHONUNBUFFERED=TRUE
+      # The PYTHONFILE environment variable specifies the absolute entry point of the application
+      # Check app.py in the transaction_verification directory to see how this is used
+      - PYTHONFILE=/app/book_database/src/app.py
+      - IS_PRIMARY=true
+      - PORT=50055
+      - BACKUP_ADDRESSES=book_database_backup_1:50056,book_database_backup_2:50057
+    volumes:
+      # Mount the utils directory in the current directory to the /app/utils directory in the container
+      - ./utils:/app/utils
+      # Mount the fraud_detection/src directory in the current directory to the /app/transaction_verification/src directory in the container
+      - ./book_database/src:/app/book_database/src
+  
+  book_database_backup_1:
+    build:
+      # Use the current directory as the build context
+      # This allows us to access the files in the current directory inside the Dockerfile
+      context: ./
+      # Use the Dockerfile in the transaction_verification directorys
+      dockerfile: ./book_database/Dockerfile
+    ports:
+      # Expose port 50052 on the host, and map port 50051 of the container to port 50052 on the host
+      - 50056:50056
+    environment:
+      # Pass the environment variables to the container
+      # The PYTHONUNBUFFERED environment variable ensures that the output from the application is logged to the console
+      - PYTHONUNBUFFERED=TRUE
+      # The PYTHONFILE environment variable specifies the absolute entry point of the application
+      # Check app.py in the transaction_verification directory to see how this is used
+      - PYTHONFILE=/app/book_database/src/app.py
+      - IS_PRIMARY=false
+      - PORT=50056
+    volumes:
+      # Mount the utils directory in the current directory to the /app/utils directory in the container
+      - ./utils:/app/utils
+      # Mount the fraud_detection/src directory in the current directory to the /app/transaction_verification/src directory in the container
+      - ./book_database/src:/app/book_database/src
+  
+  book_database_backup_2:
+    build:
+      # Use the current directory as the build context
+      # This allows us to access the files in the current directory inside the Dockerfile
+      context: ./
+      # Use the Dockerfile in the transaction_verification directorys
+      dockerfile: ./book_database/Dockerfile
+    ports:
+      # Expose port 50052 on the host, and map port 50051 of the container to port 50052 on the host
+      - 50057:50057
+    environment:
+      # Pass the environment variables to the container
+      # The PYTHONUNBUFFERED environment variable ensures that the output from the application is logged to the console
+      - PYTHONUNBUFFERED=TRUE
+      # The PYTHONFILE environment variable specifies the absolute entry point of the application
+      # Check app.py in the transaction_verification directory to see how this is used
+      - PYTHONFILE=/app/book_database/src/app.py
+      - IS_PRIMARY=false
+      - PORT=50057
+    volumes:
+      # Mount the utils directory in the current directory to the /app/utils directory in the container
+      - ./utils:/app/utils
+      # Mount the fraud_detection/src directory in the current directory to the /app/transaction_verification/src directory in the container
+      - ./book_database/src:/app/book_database/src
