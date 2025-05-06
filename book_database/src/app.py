@@ -33,8 +33,7 @@ class BooksDatabaseServicer(books_pb2_grpc.BooksDatabaseServicer):
 
     def Read(self, request, context):
         logger.info(f"Read request for book: {request.name}")
-        with self.lock:
-            stock = self.store.get(request.name, 0)
+        stock = self.store.get(request.name, 0)
         logger.debug(f"Read stock for {request.name}: {stock}")
         return books_pb2.ReadResponse(stock=stock)
 
@@ -42,8 +41,7 @@ class BooksDatabaseServicer(books_pb2_grpc.BooksDatabaseServicer):
         logger.info(
             f"Write request for book: {request.name}, new_stock: {request.new_stock}"
         )
-        with self.lock:
-            self.store[request.name] = request.new_stock
+        self.store[request.name] = request.new_stock
         logger.debug(f"Updated stock for {request.name} to {request.new_stock}")
         return books_pb2.WriteResponse(success=True)
 
@@ -173,12 +171,17 @@ class PrimaryReplica(BooksDatabaseServicer):
         logger.info(
             f"Processing Write for book: {request.name}, new_stock: {request.new_stock}"
         )
-        with self.lock:
-            self.store[request.name] = request.new_stock
-            logger.debug(f"Local write completed for {request.name}")
+        self.store[request.name] = request.new_stock
+        logger.debug(f"Local write completed for {request.name}")
         success = self._replicate_write(request)
         logger.info(f"Write operation {'succeeded' if success else 'failed'}")
         return books_pb2.WriteResponse(success=success)
+    
+    def Read(self, request, context):
+        logger.info(f"Read request for book: {request.name}")
+        stock = self.store.get(request.name, 0)
+        logger.debug(f"Read stock for {request.name}: {stock}")
+        return books_pb2.ReadResponse(stock=stock)
 
     def DecrementStock(self, request, context):
         logger.info(

@@ -153,19 +153,60 @@ class ExecutorService:
             )
 
     def execute_order(self, order_id: str, order_data: str):
+        """Process a single order."""
+        try:
+            data = json.loads(order_data)
+
+            for book in data["items"]:
+                book_name = book["name"].lower().replace(" ", "_")
+                book_quantity = book["quantity"]
+
+                current_stock = self.db_client.read_stock(book_name)
+                if current_stock < book_quantity:
+                    logger.warning(
+                        f"Insufficient stock: book_name={book_name}, "
+                        f"current_stock={current_stock}, requested={book_quantity}"
+                    )
+                    continue
+
+                success = self.db_client.decrement_stock(
+                    book_name, quantity=book_quantity
+                )
+                if success:
+                    logger.info(
+                        f"Order processed: order_id={order_id}, book_name={book_name}, "
+                        f"quantity={book_quantity}"
+                    )
+                else:
+                    logger.error(
+                        f"Order processing failed: order_id={order_id}, book_name={book_name}"
+                    )
+
+            logger.info(
+                f"Order processing completed: order_id={order_id}, executor_id={self.executor_id}"
+            )
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid order data: order_id={order_id}, error={e}")
+        except Exception as e:
+            logger.error(f"Order processing error: order_id={order_id}, error={e}")
+
+    def execute_order_2pc(self, order_id: str, order_data: str):
         """Process order using 2PC protocol"""
         try:
             data = json.loads(order_data)
 
             for book in data["items"]:
+                book_name = book["name"].lower().replace(" ", "_")
+                book_quantity = book["quantity"]
+
                 # Phase 1: Prepare
                 ready_vote = []
                 transaction_id = f"txn_{uuid.uuid4()}"
 
                 db_ready = self.db_client.prepare_update(
                     transaction_id=transaction_id,
-                    name=book["name"].lower().replace(" ", "_"),
-                    quantity=book["quantity"],
+                    name=book_name,
+                    quantity=book_quantity,
                 )
 
                 ready_vote.append(db_ready)
@@ -208,6 +249,7 @@ class ExecutorService:
                     f"Processing order: order_id={response.order_id}, executor_id={self.executor_id}"
                 )
                 self.execute_order(response.order_id, response.order_data)
+                # self.execute_order_2pc(response.order_id, response.order_data)
             else:
                 logger.debug(f"No orders available: executor_id={self.executor_id}")
         except grpc.RpcError as e:
@@ -297,6 +339,7 @@ def launch_executor():
     try:
         executor = ExecutorService(executor_id=executor_id)
         executor.initialize_stocks()
+        time.sleep(5)
         executor.start_election()
         executor.run()
     except Exception as e:
