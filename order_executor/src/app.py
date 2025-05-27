@@ -6,11 +6,17 @@ import uuid
 import redis
 import grpc
 import logging
+import psutil
 from typing import Optional
 from dataclasses import dataclass
 from database import DatabaseClient
 from payment import PaymentClient
 from order_queue import OrderQueueClient
+from opentelemetry import metrics
+from opentelemetry.metrics import Observation
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 
 # Configure standard logging
 logging.basicConfig(
@@ -18,11 +24,40 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Set up OpenTelemetry metrics
+metrics.set_meter_provider(MeterProvider(metric_readers=[
+    PeriodicExportingMetricReader(
+        OTLPMetricExporter(endpoint="http://observability:4318/v1/metrics")
+    )
+]))
+meter = metrics.get_meter(__name__)
+orders_success_counter = meter.create_counter(
+    name="orders_processed_success_total",
+    description="Total number of successfully processed orders",
+    unit="1"
+)
+
+orders_failed_counter = meter.create_counter(
+    name="orders_processed_failed_total",
+    description="Total number of failed order processing attempts",
+    unit="1"
+)
+
+def memory_usage_callback(options):
+    mem = psutil.virtual_memory()
+    used_mb = mem.used / (1024 * 1024)
+    return [Observation(used_mb, {"resource": "memory"})]
+
+memory_usage_gauge = meter.create_observable_gauge(
+    name="orders_processed_memory_usage",
+    description="Used system memory in MB",
+    unit="MB",
+    callbacks=[memory_usage_callback],
+)
 
 @dataclass
 class Config:
     """Configuration for the ExecutorService."""
-
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
     GRPC_CHANNEL: str = "order_queue:50054"
@@ -32,16 +67,13 @@ class Config:
     POLL_INTERVAL: int = 3
     BOOK_PRICE: float = 110.10
 
-
 INITIAL_STOCKS = {
     "harry_potter": 10,
     "lord_of_the_ring": 10,
 }
 
-
 class ExecutorService:
     """Service for processing book orders with leader election."""
-
     def __init__(self, executor_id: str):
         self.config = Config()
         self.executor_id = executor_id
@@ -59,7 +91,6 @@ class ExecutorService:
             decode_responses=True,
             retry_on_timeout=True,
         )
-
         self.db_client = DatabaseClient()
         self.queue_client = OrderQueueClient()
         self.payment_client = PaymentClient()
@@ -156,86 +187,80 @@ class ExecutorService:
         """Process a single order."""
         try:
             data = json.loads(order_data)
-
             for book in data["items"]:
                 book_name = book["name"].lower().replace(" ", "_")
                 book_quantity = book["quantity"]
-
                 current_stock = self.db_client.read_stock(book_name)
                 if current_stock < book_quantity:
                     logger.warning(
                         f"Insufficient stock: book_name={book_name}, "
                         f"current_stock={current_stock}, requested={book_quantity}"
                     )
-                    continue
-
-                success = self.db_client.decrement_stock(
-                    book_name, quantity=book_quantity
-                )
+                    orders_failed_counter.add(1, attributes={"order_id": order_id, "reason": "insufficient_stock"})
+                    return
+                success = self.db_client.decrement_stock(book_name, quantity=book_quantity)
                 if success:
                     logger.info(
                         f"Order processed: order_id={order_id}, book_name={book_name}, "
                         f"quantity={book_quantity}"
                     )
+                    orders_success_counter.add(1, attributes={"order_id": order_id})
                 else:
                     logger.error(
                         f"Order processing failed: order_id={order_id}, book_name={book_name}"
                     )
-
+                    orders_failed_counter.add(1, attributes={"order_id": order_id, "reason": "decrement_failed"})
+                    return
             logger.info(
                 f"Order processing completed: order_id={order_id}, executor_id={self.executor_id}"
             )
         except json.JSONDecodeError as e:
             logger.error(f"Invalid order data: order_id={order_id}, error={e}")
+            orders_failed_counter.add(1, attributes={"order_id": order_id, "reason": "invalid_json"})
         except Exception as e:
             logger.error(f"Order processing error: order_id={order_id}, error={e}")
+            orders_failed_counter.add(1, attributes={"order_id": order_id, "reason": str(e)})
 
     def execute_order_2pc(self, order_id: str, order_data: str):
-        """Process order using 2PC protocol"""
+        """Process order using 2PC protocol."""
         try:
             data = json.loads(order_data)
-
             for book in data["items"]:
                 book_name = book["name"].lower().replace(" ", "_")
                 book_quantity = book["quantity"]
-
-                # Phase 1: Prepare
-                ready_vote = []
                 transaction_id = f"txn_{uuid.uuid4()}"
-
+                ready_vote = []
                 db_ready = self.db_client.prepare_update(
                     transaction_id=transaction_id,
                     name=book_name,
                     quantity=book_quantity,
                 )
-
                 ready_vote.append(db_ready)
-
                 payment_ready = self.payment_client.prepare_update(
                     transaction_id=transaction_id
                 )
-
                 ready_vote.append(payment_ready)
-
                 if all(ready_vote):
-                    # Phase 2: Commit
                     self.db_client.commit_update(transaction_id)
                     self.payment_client.commit_update(transaction_id)
                     logger.info(f"Transaction {transaction_id} committed")
+                    orders_success_counter.add(1, attributes={"order_id": order_id, "transaction_id": transaction_id})
                 else:
-                    # Abort if any service failed
                     logger.warning(f"Aborting transaction {transaction_id}")
                     self.db_client.abort_update(transaction_id)
                     self.payment_client.abort_update(transaction_id)
+                    orders_failed_counter.add(1, attributes={"order_id": order_id, "reason": "prepare_failed"})
                     break
         except json.JSONDecodeError as e:
             logger.error(f"Invalid order data: {order_id}, error={e}")
+            orders_failed_counter.add(1, attributes={"order_id": order_id, "reason": "invalid_json"})
         except Exception as e:
             logger.error(f"Transaction failed: {transaction_id}, error={e}")
             self._handle_transaction_failure(transaction_id)
+            orders_failed_counter.add(1, attributes={"order_id": order_id, "reason": str(e)})
 
     def _handle_transaction_failure(self, transaction_id):
-        """Basic failure recovery mechanism"""
+        """Basic failure recovery mechanism."""
         logger.warning(f"Attempting recovery for {transaction_id}")
         self.db_client.abort_update(transaction_id)
         self.payment_client.abort_update(transaction_id)
@@ -256,6 +281,7 @@ class ExecutorService:
             logger.error(
                 f"gRPC error while dequeuing order: error={e.details()}, executor_id={self.executor_id}"
             )
+            orders_failed_counter.add(1, attributes={"reason": "grpc_error"})
 
     def elect_leader(self) -> str:
         """Elect a new leader from available executors."""
@@ -298,16 +324,13 @@ class ExecutorService:
             while self.running:
                 if self._should_crash():
                     break
-
                 leader_id = self.get_leader()
                 if leader_id == self.executor_id:
                     self._update_heartbeat()
                     self._process_order()
                 else:
                     self._monitor_leader(leader_id)
-
                 time.sleep(self.config.POLL_INTERVAL)
-
             # Recovery after crash
             if not self.running:
                 logger.info(f"Recovering from crash: executor_id={self.executor_id}")
@@ -332,7 +355,6 @@ class ExecutorService:
                 f"Leader active: leader_id={leader_id}, executor_id={self.executor_id}"
             )
 
-
 def launch_executor():
     """Launch the executor service."""
     executor_id = socket.gethostname()
@@ -345,7 +367,6 @@ def launch_executor():
     except Exception as e:
         logger.error(f"Executor failed: executor_id={executor_id}, error={e}")
         raise
-
 
 if __name__ == "__main__":
     launch_executor()
