@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package book_database;
+
+service BooksDatabase {
+    rpc Read (ReadRequest) returns (ReadResponse);
+    rpc Write (WriteRequest) returns (WriteResponse);
+    
+    rpc DecrementStock (DecrementRequest) returns (WriteResponse);
+    rpc IncrementStock (IncrementRequest) returns (WriteResponse);
+    rpc CompareAndSwap (CASRequest) returns (WriteResponse);
+
+    rpc Prepare (PrepareRequest) returns (Vote);
+    rpc Commit (CommitRequest) returns (Ack);
+    rpc Abort (AbortRequest) returns (Ack);
+}
+
+message ReadRequest {
+    string name = 1;
+}
+
+message ReadResponse {
+    int32 stock = 1;
+}
+
+message WriteRequest {
+    string name = 1;
+    int32 new_stock = 2;
+}
+
+message WriteResponse {
+    bool success = 1;
+}
+
+message DecrementRequest {
+    string name = 1;
+    int32 quantity = 2;
+}
+
+message IncrementRequest {
+    string name = 1;
+    int32 quantity = 2;
+}
+
+message CASRequest {
+    string name = 1;
+    int32 expected_value = 2;
+    int32 new_value = 3;
+}
+
+message PrepareRequest {
+    string transaction_id = 1;
+    string name = 2;
+    int32 quantity = 3;
+}
+
+message CommitRequest {
+    string transaction_id = 1;
+}
+
+message AbortRequest {
+    string transaction_id = 1;
+}
+
+message Vote {
+    bool ready = 1;
+}
+
+message Ack {
+    bool success = 1;
+}

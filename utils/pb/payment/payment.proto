@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+service PaymentService {
+    rpc Prepare (PrepareRequest) returns (Vote);
+    rpc Commit (CommitRequest) returns (Ack);
+    rpc Abort (AbortRequest) returns (Ack);
+}
+
+message PrepareRequest {
+    string transaction_id = 1;
+}
+
+message CommitRequest {
+    string transaction_id = 1;
+}
+
+message AbortRequest {
+    string transaction_id = 1;
+}
+
+message Vote {
+    bool ready = 1;
+}
+
+message Ack {
+    bool success = 1;
+}
